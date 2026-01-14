@@ -155,7 +155,7 @@ export default function Home() {
 
         {/* Footer */}
         <div className="text-center mt-8 text-purple-300 text-sm">
-          <p>Powered by AI · MVP 2.0</p>
+          <p>Powered by AI and love in TRT - MVP3.0</p>
         </div>
       </div>
     </div>

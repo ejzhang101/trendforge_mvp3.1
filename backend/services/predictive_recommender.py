@@ -100,13 +100,32 @@ class PredictiveRecommendationEngine:
                 channel_analysis
             )
         
-        # Sort by composite score (match + prediction)
-        recommendations.sort(
+        # Deduplicate by keyword first (keep the one with highest score)
+        seen_keywords = {}
+        deduplicated = []
+        for rec in recommendations:
+            keyword_lower = rec['keyword'].lower().strip()
+            if keyword_lower not in seen_keywords:
+                seen_keywords[keyword_lower] = rec
+                deduplicated.append(rec)
+            else:
+                # If duplicate, keep the one with higher score
+                existing_rec = seen_keywords[keyword_lower]
+                existing_score = existing_rec.get('final_score', existing_rec['match_score'])
+                current_score = rec.get('final_score', rec['match_score'])
+                if current_score > existing_score:
+                    # Replace in both dict and list
+                    seen_keywords[keyword_lower] = rec
+                    existing_idx = deduplicated.index(existing_rec)
+                    deduplicated[existing_idx] = rec
+        
+        # Sort by composite score (match + prediction) after deduplication
+        deduplicated.sort(
             key=lambda x: x.get('final_score', x['match_score']), 
             reverse=True
         )
         
-        return recommendations[:max_recommendations]
+        return deduplicated[:max_recommendations]
     
     def _enhance_with_predictions(
         self, 

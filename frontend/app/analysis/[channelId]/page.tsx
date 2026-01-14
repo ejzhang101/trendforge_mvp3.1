@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   TrendingUp,
@@ -69,7 +69,9 @@ export default function AnalysisPageV2() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
   const [selectedRec, setSelectedRec] = useState<Recommendation | null>(null);
+  const [activeTab, setActiveTab] = useState<'details' | 'prediction'>('details');
   const [error, setError] = useState<string | null>(null);
+  const fetchedForChannelIdRef = useRef<string | null>(null);
 
   const fetchResults = async () => {
     try {
@@ -102,6 +104,10 @@ export default function AnalysisPageV2() {
   };
 
   useEffect(() => {
+    // React StrictMode (dev) may invoke effects twice; guard to avoid duplicate long requests
+    if (!channelId) return;
+    if (fetchedForChannelIdRef.current === channelId) return;
+    fetchedForChannelIdRef.current = channelId;
     fetchResults();
   }, [channelId]);
 
@@ -421,35 +427,25 @@ export default function AnalysisPageV2() {
           </>
         )}
 
-        {/* MVP 3.0: Trend Predictions Section */}
-        {data.trendPredictions && data.trendPredictions.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-              <TrendingUp className="w-6 h-6 text-purple-400" />
-              🔮 7天趋势预测 - Prophet 时间序列模型
-            </h2>
-            <p className="text-purple-300 text-sm mb-6">
-              基于 Prophet 时间序列模型预测未来7天的趋势变化，包含趋势方向检测、峰值时机预测、95%置信区间和模型准确度指标
-            </p>
-            <div className="space-y-6">
-              {data.trendPredictions.map((prediction: any, idx: number) => (
-                <TrendPredictionChart
-                  key={idx}
-                  prediction={prediction}
-                  showAccuracy={true}
-                />
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* MVP 3.0: Emerging Trends Section */}
         {(() => {
-          const trends = Array.isArray(data.emergingTrends) ? data.emergingTrends : [];
-          if (trends.length === 0) {
-            console.log('⚠️ No emerging trends to display');
+          // 去重逻辑：过滤掉那些已经在"AI 智能推荐话题"中显示的关键词
+          const recommendationKeywords = new Set(
+            (data.recommendations || []).map((rec: Recommendation) => rec.keyword?.toLowerCase().trim())
+          );
+          
+          const allTrends = Array.isArray(data.emergingTrends) ? data.emergingTrends : [];
+          const uniqueTrends = allTrends.filter((trend: any) => {
+            const keyword = trend.keyword?.toLowerCase().trim();
+            // 只显示不在推荐列表中的新兴趋势，避免重复
+            return keyword && !recommendationKeywords.has(keyword);
+          });
+          
+          if (uniqueTrends.length === 0) {
             return null;
           }
+          
           return (
           <div className="bg-gradient-to-br from-yellow-600/20 to-orange-600/20 rounded-2xl p-6 mb-8 border border-yellow-500/30">
             <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
@@ -458,9 +454,14 @@ export default function AnalysisPageV2() {
             </h2>
             <p className="text-purple-300 text-sm mb-6">
               基于 Prophet 预测模型识别的高置信度上升趋势话题，建议优先关注
+              {recommendationKeywords.size > 0 && (
+                <span className="block mt-2 text-xs text-yellow-400">
+                  💡 已过滤与"AI 智能推荐话题"重复的关键词，避免重复展示
+                </span>
+              )}
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {trends.map((trend: any, idx: number) => {
+              {uniqueTrends.map((trend: any, idx: number) => {
                 console.log(`📊 Rendering emerging trend ${idx}:`, {
                   keyword: trend.keyword,
                   peak_day: trend.peak_day,
@@ -518,13 +519,30 @@ export default function AnalysisPageV2() {
             )}
           </div>
 
-          {data.recommendations && data.recommendations.length > 0 ? (
-            <div className="space-y-4">
-              {data.recommendations.map((rec: Recommendation) => (
+          {data.recommendations && data.recommendations.length > 0 ? (() => {
+            // 前端去重：确保每个关键词只显示一次（保留匹配度最高的）
+            const seenKeywords = new Map<string, Recommendation>();
+            data.recommendations.forEach((rec: Recommendation) => {
+              const keywordLower = rec.keyword?.toLowerCase().trim() || '';
+              if (keywordLower) {
+                const existing = seenKeywords.get(keywordLower);
+                if (!existing || (rec.matchScore > existing.matchScore)) {
+                  seenKeywords.set(keywordLower, rec);
+                }
+              }
+            });
+            const uniqueRecommendations = Array.from(seenKeywords.values());
+            
+            return (
+              <div className="space-y-4">
+                {uniqueRecommendations.map((rec: Recommendation) => (
                 <div
                   key={rec.id}
                   className="bg-white/5 hover:bg-white/10 rounded-xl p-5 border border-white/10 transition-all cursor-pointer"
-                  onClick={() => setSelectedRec(rec)}
+                  onClick={() => {
+                    setSelectedRec(rec);
+                    setActiveTab('details'); // Reset to details tab when opening
+                  }}
                 >
                   {/* Header */}
                   <div className="flex items-start justify-between mb-3">
@@ -654,8 +672,9 @@ export default function AnalysisPageV2() {
                   )}
                 </div>
               ))}
-            </div>
-          ) : (
+              </div>
+            );
+          })() : (
             <div className="text-center py-12">
               <TrendingDown className="w-16 h-16 text-purple-400 mx-auto mb-4 opacity-50" />
               <p className="text-purple-300">暂无推荐，请稍后重试</p>
@@ -896,27 +915,66 @@ export default function AnalysisPageV2() {
         )}
 
         {/* Modal for detailed recommendation */}
-        {selectedRec && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-slate-900 rounded-2xl max-w-4xl w-full max-h-[85vh] overflow-y-auto border border-white/20">
-              <div className="sticky top-0 bg-slate-900 border-b border-white/10 p-6">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="text-2xl font-bold text-white mb-2">
-                      {selectedRec.keyword}
-                    </h3>
-                    <p className="text-purple-300">{selectedRec.contentAngle}</p>
+        {selectedRec && (() => {
+          // 从 trendPredictions 中找到对应推荐关键词的完整预测数据
+          const fullPrediction = (data.trendPredictions || []).find(
+            (pred: any) => pred.keyword?.toLowerCase().trim() === selectedRec.keyword?.toLowerCase().trim()
+          );
+          
+          return (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <div className="bg-slate-900 rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto border border-white/20">
+                <div className="sticky top-0 bg-slate-900 border-b border-white/10 p-6 z-10">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="text-2xl font-bold text-white mb-2">
+                        {selectedRec.keyword}
+                      </h3>
+                      <p className="text-purple-300">{selectedRec.contentAngle}</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedRec(null);
+                        setActiveTab('details'); // Reset tab when closing
+                      }}
+                      className="text-purple-300 hover:text-white text-2xl"
+                    >
+                      ✕
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setSelectedRec(null)}
-                    className="text-purple-300 hover:text-white text-2xl"
-                  >
-                    ✕
-                  </button>
+                  
+                  {/* Tab Navigation */}
+                  <div className="flex gap-2 border-b border-white/10">
+                    <button
+                      onClick={() => setActiveTab('details')}
+                      className={`px-4 py-2 font-semibold transition-all ${
+                        activeTab === 'details'
+                          ? 'text-white border-b-2 border-purple-400'
+                          : 'text-purple-300 hover:text-white'
+                      }`}
+                    >
+                      📋 详细信息
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('prediction')}
+                      className={`px-4 py-2 font-semibold transition-all ${
+                        activeTab === 'prediction'
+                          ? 'text-white border-b-2 border-purple-400'
+                          : 'text-purple-300 hover:text-white'
+                      }`}
+                      disabled={!fullPrediction}
+                    >
+                      🔮 7天趋势预测
+                      {!fullPrediction && (
+                        <span className="ml-2 text-xs text-purple-400">(暂无数据)</span>
+                      )}
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              <div className="p-6 space-y-6">
+                <div className="p-6">
+                  {activeTab === 'details' ? (
+                    <div className="space-y-6">
                 {/* All Titles */}
                 <div>
                   <h4 className="text-lg font-bold text-white mb-3">✍️ AI 生成标题</h4>
@@ -1015,10 +1073,31 @@ export default function AnalysisPageV2() {
                     )}
                   </div>
                 )}
+                    </div>
+                  ) : (
+                    /* Prediction Tab */
+                    <div>
+                      {fullPrediction ? (
+                        <TrendPredictionChart
+                          prediction={fullPrediction}
+                          showAccuracy={true}
+                        />
+                      ) : (
+                        <div className="bg-white/5 rounded-lg p-8 border border-white/10 text-center">
+                          <TrendingUp className="w-16 h-16 text-purple-400 mx-auto mb-4 opacity-50" />
+                          <p className="text-purple-300 mb-2">暂无趋势预测数据</p>
+                          <p className="text-purple-400 text-sm">
+                            该话题的 Prophet 预测数据暂不可用，请稍后重试或重新分析该频道
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );

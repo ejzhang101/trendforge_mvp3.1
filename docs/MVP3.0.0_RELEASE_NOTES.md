@@ -31,6 +31,12 @@
 - 新增“自动刷新 DB 中旧预测”的策略：
   - `GET /api/analysis/[channelId]` 检测到存量预测低于阈值或算法版本变化时，自动调用后端 `/api/v3/predict-trends` 重新生成，并写回 `fingerprint` 与 `recommendationData.prediction`
 
+### 3) 结果页“持续加载中”
+- 原因：React StrictMode 导致 `/api/analysis/[channelId]` 被触发两次 + 预测刷新缺乏互斥锁与超时控制
+- 解决：
+  - 在前端 API 路由中引入 `predictionRefreshPromise` in-flight 锁与 30s 超时，限制预测刷新只进行一次且可中断
+  - 结果页组件使用 `useRef` guard 防止重复 `fetchResults` 调用
+
 ---
 
 ## 🧩 主要接口
@@ -50,6 +56,12 @@
   - “峰值: 第X天 (XX分)”
 - **新兴趋势**（黄色文字提示）：
   - “预计第X天达到峰值”
+
+---
+
+## 🎨 其他产品层改动
+
+- 首页 footer 文案更新为：`Powered by AI and love in TRT - MVP3.0`，与本次 MVP 3.0 定位保持一致
 
 ---
 

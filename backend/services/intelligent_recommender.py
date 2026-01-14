@@ -73,10 +73,27 @@ class TopicRecommendationEngine:
                     }
                 })
         
-        # Sort by match score
-        recommendations.sort(key=lambda x: x['match_score'], reverse=True)
+        # Deduplicate by keyword first (keep the one with highest match_score)
+        seen_keywords = {}
+        deduplicated = []
+        for rec in recommendations:
+            keyword_lower = rec['keyword'].lower().strip()
+            if keyword_lower not in seen_keywords:
+                seen_keywords[keyword_lower] = rec
+                deduplicated.append(rec)
+            else:
+                # If duplicate, keep the one with higher match_score
+                existing_rec = seen_keywords[keyword_lower]
+                if rec['match_score'] > existing_rec['match_score']:
+                    # Replace in both dict and list
+                    seen_keywords[keyword_lower] = rec
+                    existing_idx = deduplicated.index(existing_rec)
+                    deduplicated[existing_idx] = rec
         
-        return recommendations[:max_recommendations]
+        # Sort by match score after deduplication
+        deduplicated.sort(key=lambda x: x['match_score'], reverse=True)
+        
+        return deduplicated[:max_recommendations]
     
     def _calculate_match_score(
         self,

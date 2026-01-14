@@ -88,7 +88,38 @@
 
 ---
 
+## ♻️ 预测刷新与前端加载控制（2026-01-14 更新）
+
+- **预测自动刷新策略**：
+  - `frontend/app/api/analysis/[channelId]/route.ts` 中根据 `predictions_algo_version` 与最小置信度自动决定是否调用 `/api/v3/predict-trends` 重新生成预测并落库
+  - 使用进程内 `predictionRefreshPromise` 作为 in-flight 锁，避免同一频道并发刷新导致的重复计算与长时间阻塞
+- **结果页加载控制**：
+  - 结果页 `analysis/[channelId]/page.tsx` 使用 `useRef` guard 防止 React StrictMode 下的双重 `fetchResults` 调用
+  - 对预测刷新请求增加 30s 超时，保证即使后端预测偏慢也不会让 UI 无限 loading
+
+---
+
+## 🎨 UI/UX 设计（MVP 3.0.0 更新）
+
+### 推荐详情弹窗 Tab 设计
+
+- **Tab 1: 详细信息**：显示 AI 生成标题、表现预测、相关信息等原有内容
+- **Tab 2: 7天趋势预测**：显示完整的 `TrendPredictionChart` 组件
+  - 7 天趋势图表（含置信区间）
+  - 趋势方向、强度、置信度
+  - 峰值时机预测
+  - 模型准确度指标（MAE, RMSE, MAPE）
+  - 每日详细预测表格
+
+### 去重机制
+
+- **后端去重**：在 `predictive_recommender.py` 和 `intelligent_recommender.py` 中，对同一关键词（不区分大小写）只保留匹配度最高的推荐
+- **前端去重**：在显示推荐列表时进行二次去重，确保每个关键词只显示一次
+
+---
+
 ## ⚠️ 注意事项
 
 - `GET /api/v3/debug-runtime` 为本地调试用端点，用于验证运行时加载的预测代码版本与置信度函数；如要生产部署建议关闭或加鉴权。
+- 旧数据（在去重逻辑添加前生成的分析结果）可能仍包含重复推荐，需要重新分析频道才能看到去重效果。
 

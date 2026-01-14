@@ -503,37 +503,54 @@ class TrendPredictionEngine:
     
     def _calculate_model_accuracy(self, model, df: pd.DataFrame) -> Dict:
         """
-        Calculate model accuracy metrics using cross-validation
+        Calculate model accuracy metrics (fast path).
+        
+        NOTE:
+        Prophet cross_validation can be very slow and can spawn extra processes,
+        which caused long API latency and "loading forever" on the frontend.
+        
+        We instead compute lightweight in-sample accuracy on the most recent
+        14 days of available history. This is deterministic and fast enough
+        for interactive UI.
         """
         try:
-            from prophet.diagnostics import cross_validation, performance_metrics
+            if df is None or len(df) < 10:
+                return {'mae': 0, 'rmse': 0, 'mape': 0, 'coverage': 0.8}
             
-            # Perform cross-validation (last 7 days as test)
-            df_cv = cross_validation(
-                model, 
-                initial='30 days', 
-                period='7 days', 
-                horizon='7 days',
-                parallel="processes"
-            )
+            eval_window = min(14, len(df))
+            df_eval = df.tail(eval_window).copy()
+            df_pred = model.predict(df_eval[['ds']])
             
-            # Calculate performance metrics
-            perf_metrics = performance_metrics(df_cv)
+            # Align arrays
+            y_true = df_eval['y'].astype(float).values
+            y_hat = df_pred['yhat'].astype(float).values
+            y_lo = df_pred['yhat_lower'].astype(float).values
+            y_hi = df_pred['yhat_upper'].astype(float).values
+            
+            abs_err = (y_true - y_hat)
+            mae = float((abs_err.__abs__()).mean())
+            rmse = float(((abs_err ** 2).mean()) ** 0.5)
+            
+            # MAPE with safe denominator
+            denom = (y_true.copy())
+            denom[denom == 0] = 1.0
+            mape = float(((abs_err.__abs__()) / denom).mean())
+            
+            coverage = float(((y_true >= y_lo) & (y_true <= y_hi)).mean())
             
             return {
-                'mae': round(float(perf_metrics['mae'].mean()), 2),
-                'rmse': round(float(perf_metrics['rmse'].mean()), 2),
-                'mape': round(float(perf_metrics['mape'].mean()), 2),
-                'coverage': round(float(perf_metrics['coverage'].mean()), 2)
+                'mae': round(mae, 2),
+                'rmse': round(rmse, 2),
+                'mape': round(mape, 2),
+                'coverage': round(coverage, 2),
             }
         except Exception as e:
-            # If cross-validation fails, return basic metrics
-            print(f"⚠️ Cross-validation failed: {e}")
+            print(f"⚠️ Accuracy calc failed (fast path): {e}")
             return {
                 'mae': 0,
                 'rmse': 0,
                 'mape': 0,
-                'coverage': 0.95
+                'coverage': 0.8
             }
     
     def batch_predict(self, keywords: List[str], 

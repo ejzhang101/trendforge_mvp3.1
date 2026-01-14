@@ -2,7 +2,7 @@
 
 > 本文档记录 TrendForge 项目开发过程中的所有重要结论、决策、优化历史和关键发现。
 
-**最后更新**: 2024-01-13  
+**最后更新**: 2026-01-14 (MVP 3.0 完整版)  
 **维护者**: TrendForge 开发团队
 
 ---
@@ -38,20 +38,32 @@
 - 社交趋势聚合需要跨平台加权（Twitter 30%, Reddit 30%, Google 40%）
 - 匹配分数算法：互联网热度 40% + 表现潜力 25% + 内容相关性 35%
 
-### MVP 2.0 → MVP 3.0
+### MVP 2.0 → 2.0.1（SerpAPI + 回测增强）
 
-**时间**: 2024-01-13  
+**时间**: 2026-01-13  
 **主要变更**:
-- 引入 Prophet 时间序列预测引擎
-- 实现增强版社交媒体收集器（速率限制、缓存、深度分析）
-- 升级推荐引擎为预测式推荐（集成 Prophet 预测）
-- 添加 ML 模型预测器（Random Forest, XGBoost, LightGBM, Stacking）
-- 实现回测分析器
+- 集成 SerpAPI 作为 Google/Twitter/Reddit 搜索结果的补充/替代信号源
+- 更新社交趋势聚合权重（SerpAPI 纳入 20% 权重）
+- 回测分析器保证每个频道至少回测 50 条历史视频（如可用），并修复异步调用导致的 `0` 条视频问题
 
 **关键结论**:
-- Prophet 预测可以显著提升推荐准确性（final_score = current_match × 60% + predictive × 40%）
-- 速率限制和缓存机制是社交 API 集成的关键
-- ML 模型需要自适应特征选择和交叉验证以确保跨频道一致性
+- 通过 SerpAPI 降低单一 API 限流带来的全链路失败风险
+- 回测样本量不足会显著影响指标稳定性，需要下限约束
+
+### 2.0.1 → MVP 3.0.0（Prophet 预测重集成与稳定性优化）
+
+**时间**: 2026-01-14  
+**主要变更**:
+- 重新引入并稳定 Prophet 时间序列预测引擎（7 天趋势预测、峰值时机、置信区间、模型准确度）
+- 在 `app_v2.py` 中使用 `PredictiveRecommendationEngine` 集成预测结果，补充推荐卡片的 `prediction` 字段
+- 前端新增预测图表组件、推荐卡片预测信息、新兴趋势区块，并完成落库/读取链路
+- **UI/UX 整合优化**：将"7天趋势预测"整合到推荐详情弹窗中，通过 Tab 切换查看，避免重复展示
+- **去重机制**：后端和前端双重去重，确保每个关键词只显示一次（保留匹配度最高的推荐）
+- 在 `/api/analysis/[channelId]` 中引入基于算法版本与最小置信度的自动刷新机制，保证展示端预测置信度 ≥ 75%
+
+**关键结论**:
+- 仅在需要时刷新预测（按阈值与版本控制）可以在性能与结果新鲜度之间取得平衡
+- 结果页“持续加载中”多由重复预测刷新 + React StrictMode 双重渲染触发，需要在前端和 API 层同时引入互斥与超时控制
 
 ---
 
@@ -349,6 +361,62 @@ find . -name "__pycache__" -type d -exec rm -rf {} +
 3. 前端添加条件渲染和用户提示
 
 **结论**: 新功能需要考虑旧数据的兼容性
+
+### 8. 结果页持续加载问题（MVP 3.0.0）
+
+**问题**: 结果页"持续加载中"，无法加载到结果页  
+**原因**:
+1. Prophet 预测刷新（包括 cross_validation）耗时过长（50s+）
+2. React StrictMode 在开发环境下触发双重 fetch
+3. 预测刷新请求可能并行触发，导致重复请求
+
+**解决方案**:
+1. **后端优化**：在 `trend_predictor.py` 中，将昂贵的 `cross_validation` 替换为更快的 in-sample 准确度计算
+2. **前端 API 路由优化**：在 `frontend/app/api/analysis/[channelId]/route.ts` 中：
+   - 添加 in-flight 请求锁（`predictionRefreshPromise`）防止重复/并行预测刷新请求
+   - 对预测请求的关键词进行去重并限制为 top 3
+   - 为预测刷新 fetch 添加 30 秒超时
+3. **前端页面优化**：在 `frontend/app/analysis/[channelId]/page.tsx` 中，添加 `useRef` guard（`hasFetched.current`）防止 React StrictMode 下的重复 `fetchResults` 调用
+
+**结论**: 异步操作需要互斥锁和超时保护，React StrictMode 需要 guard 机制
+
+### 9. 推荐话题重复显示问题（MVP 3.0.0）
+
+**问题**: "AI 智能推荐话题"板块中，同一个关键词出现多次（如"actually traderlifestyle daytradingforbeginners"出现 3 次）  
+**原因**:
+1. 社交趋势数据（`social_trends`）可能包含重复的关键词（来自不同平台或不同时间点）
+2. 推荐引擎在遍历 `social_trends` 时，对每个趋势都生成推荐，未进行去重
+
+**解决方案**:
+1. **后端去重**：
+   - 在 `predictive_recommender.py` 和 `intelligent_recommender.py` 中，在排序前先进行关键词去重
+   - 对同一个关键词（不区分大小写），只保留匹配度/最终分数最高的推荐
+   - 使用 `seen_keywords` 字典跟踪已处理的关键词
+2. **前端去重**：
+   - 在 `frontend/app/analysis/[channelId]/page.tsx` 中，显示推荐列表前进行二次去重
+   - 使用 `Map` 存储已见关键词，保留匹配度最高的推荐
+   - 作为双重保险，即使后端有重复也能过滤
+
+**去重策略**:
+- 关键词标准化：统一转为小写并去除首尾空格
+- 保留策略：同一关键词只保留匹配度/最终分数最高的推荐
+- 执行时机：后端在生成推荐时去重，前端在显示时再次去重
+
+**结论**: 数据去重应该在数据生成阶段（后端）和展示阶段（前端）都进行，确保数据质量
+
+### 8. 结果页持续加载问题（MVP 3.0.0）
+
+**问题**: 输入频道并点击分析后，结果页长期停留在“加载中”，或浏览器报错 “Application error: a client-side exception has occurred”  
+**原因**:
+1. `/api/analysis/[channelId]` 在检测到旧预测置信度较低时，会触发耗时较长的 Prophet 预测刷新；React StrictMode 会导致该调用在客户端被触发两次
+2. 预测刷新前缺乏 in-flight 锁与请求超时控制，导致多个并发刷新阻塞响应
+
+**解决方案**:
+1. 在 `frontend/app/api/analysis/[channelId]/route.ts` 中引入进程内 `predictionRefreshPromise` 互斥锁，并为 `/api/v3/predict-trends` 请求增加 30 秒超时与关键词去重/数量上限
+2. 在 `frontend/app/analysis/[channelId]/page.tsx` 中使用 `useRef` guard 避免 React StrictMode 下重复触发 `fetchResults`
+3. 保证无论预测刷新是否成功，API 都会在合理时间内返回已有结果，避免前端无限等待
+
+**结论**: 需要将“预测刷新”视为可选增强，而非阻塞页面返回的必经步骤；前端/后端都要有防抖与超时机制
 
 ---
 
@@ -750,4 +818,4 @@ pnpm prisma generate
 
 **文档维护**: 每次重大变更或重要决策后更新本文档  
 **版本**: 1.0.0  
-**最后更新**: 2024-01-13
+**最后更新**: 2026-01-14

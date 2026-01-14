@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+// Deduplicate concurrent prediction refreshes (React strict mode can double-call)
+const globalForPredRefresh = globalThis as any;
+const predictionRefreshLocks: Map<string, Promise<{ trendPredictions: any[]; emergingTrends: any[] }>> =
+  globalForPredRefresh.__trendforge_prediction_refresh_locks ||
+  (globalForPredRefresh.__trendforge_prediction_refresh_locks = new Map());
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { channelId: string } }
@@ -66,89 +72,123 @@ export async function GET(
 
     if (shouldRefreshPredictions) {
       try {
-        const keywords = channel.trends
-          .map((ct) => ct.trend?.keyword)
-          .filter(Boolean)
-          .slice(0, 5) as string[];
+        // unique top keywords (avoid duplicates)
+        const keywords = Array.from(
+          new Set(
+            channel.trends
+              .map((ct) => ct.trend?.keyword)
+              .filter(Boolean)
+          )
+        ).slice(0, 3) as string[]; // keep it fast for interactive load
 
         if (keywords.length > 0) {
-          console.log('🔄 Refreshing stored trend predictions...', {
-            channelId: channel.channelId,
-            storedAlgoVersion,
-            targetAlgoVersion: PREDICTIONS_ALGO_VERSION,
-            storedMinConfidence,
-            targetMinConfidence: PREDICTIONS_MIN_CONFIDENCE,
-            keywords,
-          });
+          const lockKey = `${channel.channelId}:${PREDICTIONS_ALGO_VERSION}`;
+          let refreshPromise = predictionRefreshLocks.get(lockKey);
 
-          const resp = await fetch(`${backendBaseUrl}/api/v3/predict-trends`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ keywords, forecast_days: 7 }),
-          });
-
-          if (resp.ok) {
-            const predJson = await resp.json();
-            if (predJson?.success) {
-              trendPredictions = Array.isArray(predJson.predictions) ? predJson.predictions : [];
-              emergingTrends = Array.isArray(predJson.emerging_trends) ? predJson.emerging_trends : [];
-
-              // Persist refreshed predictions into fingerprint
-              await prisma.channel.update({
-                where: { channelId: channel.channelId },
-                data: {
-                  fingerprint: {
-                    ...(fingerprint || {}),
-                    v2_analysis: {
-                      ...(v2Analysis || {}),
-                      trend_predictions: trendPredictions,
-                      emerging_trends: emergingTrends,
-                      predictions_algo_version: PREDICTIONS_ALGO_VERSION,
-                      predictions_enabled: true,
-                    },
-                  },
-                },
+          if (!refreshPromise) {
+            refreshPromise = (async () => {
+              console.log('🔄 Refreshing stored trend predictions...', {
+                channelId: channel.channelId,
+                storedAlgoVersion,
+                targetAlgoVersion: PREDICTIONS_ALGO_VERSION,
+                storedMinConfidence,
+                targetMinConfidence: PREDICTIONS_MIN_CONFIDENCE,
+                keywords,
               });
 
-              // Update stored recommendationData.prediction for top trends so purple cards can show peak info
-              const predictionMap = new Map<string, any>(
-                trendPredictions.map((p: any) => [p.keyword, p])
-              );
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 45000); // avoid hanging forever
 
-              await Promise.all(
-                channel.trends.map(async (ct) => {
-                  const kw = ct.trend?.keyword;
-                  const pred = kw ? predictionMap.get(kw) : null;
-                  if (!kw || !pred) return;
+              try {
+                const resp = await fetch(`${backendBaseUrl}/api/v3/predict-trends`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  signal: controller.signal,
+                  body: JSON.stringify({ keywords, forecast_days: 7 }),
+                });
 
-                  const recData = (ct.recommendationData as any) || {};
-                  await prisma.channelTrend.update({
-                    where: { id: ct.id },
-                    data: {
-                      recommendationData: {
-                        ...recData,
-                        prediction: {
-                          trend_direction: pred.trend_direction,
-                          trend_strength: pred.trend_strength,
-                          confidence: pred.confidence,
-                          peak_day: pred.peak_day,
-                          peak_score: pred.peak_score,
-                          summary: pred.summary,
-                          predictions: Array.isArray(pred.predictions) ? pred.predictions.slice(0, 7) : [],
-                        },
+                if (!resp.ok) {
+                  console.log('⚠️ Prediction refresh failed (backend response not ok)', { status: resp.status });
+                  return { trendPredictions: [], emergingTrends: [] };
+                }
+
+                const predJson = await resp.json();
+                if (!predJson?.success) {
+                  return { trendPredictions: [], emergingTrends: [] };
+                }
+
+                const newTrendPredictions = Array.isArray(predJson.predictions) ? predJson.predictions : [];
+                const newEmergingTrends = Array.isArray(predJson.emerging_trends) ? predJson.emerging_trends : [];
+
+                // Persist refreshed predictions into fingerprint
+                await prisma.channel.update({
+                  where: { channelId: channel.channelId },
+                  data: {
+                    fingerprint: {
+                      ...(fingerprint || {}),
+                      v2_analysis: {
+                        ...(v2Analysis || {}),
+                        trend_predictions: newTrendPredictions,
+                        emerging_trends: newEmergingTrends,
+                        predictions_algo_version: PREDICTIONS_ALGO_VERSION,
+                        predictions_enabled: true,
                       },
                     },
-                  });
-                })
-              );
+                  },
+                });
 
-              console.log('✅ Refreshed predictions saved', {
-                trendPredictionsCount: trendPredictions.length,
-                emergingTrendsCount: emergingTrends.length,
-              });
-            }
-          } else {
-            console.log('⚠️ Prediction refresh failed (backend response not ok)', { status: resp.status });
+                // Update stored recommendationData.prediction for top trends so purple cards can show peak info
+                const predictionMap = new Map<string, any>(
+                  newTrendPredictions.map((p: any) => [p.keyword, p])
+                );
+
+                await Promise.all(
+                  channel.trends.map(async (ct) => {
+                    const kw = ct.trend?.keyword;
+                    const pred = kw ? predictionMap.get(kw) : null;
+                    if (!kw || !pred) return;
+
+                    const recData = (ct.recommendationData as any) || {};
+                    await prisma.channelTrend.update({
+                      where: { id: ct.id },
+                      data: {
+                        recommendationData: {
+                          ...recData,
+                          prediction: {
+                            trend_direction: pred.trend_direction,
+                            trend_strength: pred.trend_strength,
+                            confidence: pred.confidence,
+                            peak_day: pred.peak_day,
+                            peak_score: pred.peak_score,
+                            summary: pred.summary,
+                            predictions: Array.isArray(pred.predictions) ? pred.predictions.slice(0, 7) : [],
+                          },
+                        },
+                      },
+                    });
+                  })
+                );
+
+                console.log('✅ Refreshed predictions saved', {
+                  trendPredictionsCount: newTrendPredictions.length,
+                  emergingTrendsCount: newEmergingTrends.length,
+                });
+
+                return { trendPredictions: newTrendPredictions, emergingTrends: newEmergingTrends };
+              } finally {
+                clearTimeout(timeoutId);
+              }
+            })().finally(() => {
+              predictionRefreshLocks.delete(lockKey);
+            });
+
+            predictionRefreshLocks.set(lockKey, refreshPromise);
+          }
+
+          const refreshed = await refreshPromise;
+          if (refreshed.trendPredictions.length > 0) {
+            trendPredictions = refreshed.trendPredictions;
+            emergingTrends = refreshed.emergingTrends;
           }
         }
       } catch (e) {
