@@ -1,6 +1,6 @@
 """
-TrendForge AI Backend - MVP 2.0
-Deep content analysis with social media trends
+TrendForge AI Backend - MVP 3.0
+Deep content analysis with social media trends + Prophet time series prediction
 """
 
 from fastapi import FastAPI, HTTPException
@@ -42,12 +42,37 @@ except ImportError:
     USE_ENHANCED_COLLECTOR = False
     print("⚠️ Using original Social Media Collector")
 
-# Use original recommendation engine (MVP 2.0)
-from services.intelligent_recommender import (
-    recommendation_engine,
-    title_engine
-)
-print("✅ Using Recommendation Engine (MVP 2.0)")
+# Try to use predictive recommendation engine (MVP 3.0), fallback to original
+try:
+    from services.predictive_recommender import PredictiveRecommendationEngine
+    predictive_recommender = PredictiveRecommendationEngine()
+    USE_PREDICTIVE_ENGINE = True
+    print("✅ Using Predictive Recommendation Engine (MVP 3.0 with Prophet)")
+    # Also import original engine for backtest analyzer compatibility
+    from services.intelligent_recommender import (
+        recommendation_engine,
+        title_engine
+    )
+except ImportError:
+    from services.intelligent_recommender import (
+        recommendation_engine,
+        title_engine
+    )
+    USE_PREDICTIVE_ENGINE = False
+    predictive_recommender = None
+    print("✅ Using Recommendation Engine (MVP 2.0)")
+
+# Import Prophet predictor for MVP 3.0
+try:
+    from services.trend_predictor import trend_predictor, PROPHET_AVAILABLE
+    if PROPHET_AVAILABLE:
+        print("✅ Prophet Prediction Engine loaded (MVP 3.0)")
+    else:
+        print("⚠️ Prophet not installed, predictions will be disabled")
+except ImportError:
+    trend_predictor = None
+    PROPHET_AVAILABLE = False
+    print("⚠️ Prophet predictor not available")
 
 # Load environment variables
 load_dotenv()
@@ -82,8 +107,8 @@ backtest_analyzer = BacktestAnalyzer(recommendation_engine, social_aggregator)
 print("✅ Backtest Analyzer loaded (MVP 2.0)")
 
 app = FastAPI(
-    title="TrendForge AI Backend - MVP 2.0 (Quick Fix)",
-    version="2.0.1-quickfix",
+    title="TrendForge AI Backend - MVP 3.0 (Prophet)",
+    version="3.0.0",
     description="Intelligent YouTube trend prediction with deep content analysis"
 )
 
@@ -136,12 +161,22 @@ class TitleGenerationRequest(BaseModel):
     count: int = 3
 
 
-# MVP 2.0: No prediction request model
+# MVP 3.0: Prediction request models
+class TrendPredictionRequest(BaseModel):
+    """Request model for Prophet trend predictions"""
+    keywords: List[str]
+    forecast_days: int = 7
+
+
+class StoreTrendDataRequest(BaseModel):
+    """Request model for storing trend data"""
+    keyword: str
+    data: Dict
 
 
 class FullAnalysisRequest(BaseModel):
     """
-    Complete analysis request combining all steps (MVP 2.0)
+    Complete analysis request combining all steps (MVP 3.0)
     """
     videos: List[Dict]
     channel_data: Dict
@@ -149,6 +184,7 @@ class FullAnalysisRequest(BaseModel):
     analyze_transcripts: bool = False
     max_recommendations: int = 10
     enable_backtest: bool = True  # 启用回测分析 (MVP 2.0)
+    enable_predictions: bool = True  # 启用 Prophet 预测 (MVP 3.0)
     use_simple_mode: bool = False  # 简单模式：跳过社交趋势收集（默认关闭，使用完整分析）
 
 
@@ -156,25 +192,37 @@ class FullAnalysisRequest(BaseModel):
 
 @app.get("/")
 async def root():
+    features = [
+        "Deep content analysis with NLP",
+        "Video transcript analysis",
+        "Enhanced multi-platform social media trends",
+        "Intelligent rate limiting and caching",
+        "Cross-platform signal verification",
+        "Intelligent topic recommendations",
+        "AI-powered title generation",
+        "Historical video backtest analysis"
+    ]
+    
+    # Add MVP 3.0 features if Prophet is available
+    if PROPHET_AVAILABLE:
+        features.extend([
+            "🔮 Prophet time series prediction (7-day forecast)",
+            "🔮 Trend direction detection (rising/falling/stable)",
+            "🔮 Peak timing identification",
+            "🔮 Confidence intervals (95%)"
+        ])
+    
     return {
         "service": "TrendForge AI Backend",
-        "version": "2.0.1-quickfix",
-        "features": [
-            "Deep content analysis with NLP",
-            "Video transcript analysis",
-            "Enhanced multi-platform social media trends",
-            "Intelligent rate limiting and caching",
-            "Cross-platform signal verification",
-            "Intelligent topic recommendations",
-            "AI-powered title generation",
-            "Historical video backtest analysis"
-        ],
+        "version": "3.0.0" if PROPHET_AVAILABLE else "2.0.1-quickfix",
+        "features": features,
         "status": "running",
         "enhancements": {
             "rate_limiting": "✅ Automatic",
             "caching": "✅ Redis + Memory",
             "signal_analysis": "✅ Deep analysis",
-            "cross_platform": "✅ Verified signals"
+            "cross_platform": "✅ Verified signals",
+            "time_series_prediction": "✅ Prophet" if PROPHET_AVAILABLE else "❌ Not available"
         }
     }
 
@@ -378,11 +426,20 @@ async def full_analysis(request: FullAnalysisRequest):
         try:
             # 即使没有社交媒体趋势，也基于频道分析生成推荐
             if social_trends_data['merged_trends']:
-                recommendations = recommendation_engine.generate_recommendations(
-                    channel_analysis,
-                    social_trends_data['merged_trends'],
-                    request.max_recommendations
-                )
+                # Use predictive engine if available (MVP 3.0)
+                if USE_PREDICTIVE_ENGINE:
+                    recommendations = predictive_recommender.generate_recommendations(
+                        channel_analysis,
+                        social_trends_data['merged_trends'],
+                        request.max_recommendations,
+                        enable_predictions=request.enable_predictions and PROPHET_AVAILABLE
+                    )
+                else:
+                    recommendations = recommendation_engine.generate_recommendations(
+                        channel_analysis,
+                        social_trends_data['merged_trends'],
+                        request.max_recommendations
+                    )
             else:
                 # 如果没有社交媒体趋势，基于频道主题生成推荐
                 print("   ℹ️ No social trends, generating recommendations from channel topics...")
@@ -497,12 +554,128 @@ async def full_analysis(request: FullAnalysisRequest):
             print("   ℹ️ Backtest disabled in request")
             backtest_status["status"] = "disabled"
         
+        # Step 5: Prophet predictions (if enabled and available)
+        trend_predictions = None
+        emerging_trends = None
+        if request.enable_predictions and PROPHET_AVAILABLE and trend_predictor:
+            print("🔮 Step 5/5: Generating Prophet predictions...")
+            step_start = datetime.utcnow()
+            try:
+                # Extract keywords from recommendations (use all for better coverage)
+                prediction_keywords = [r['keyword'] for r in recommendations[:10]]  # Top 10 recommendations
+                
+                print(f"   📋 Keywords for prediction: {prediction_keywords}")
+                
+                if prediction_keywords:
+                    # Use sync method in thread (Prophet is CPU-bound)
+                    predictions_result = await asyncio.to_thread(
+                        trend_predictor.predict_trends,
+                        prediction_keywords,
+                        7  # forecast_days
+                    )
+                    
+                    trend_predictions = predictions_result.get('predictions', [])
+                    emerging_trends_raw = predictions_result.get('emerging_trends', [])
+                    
+                    print(f"   📊 Predictions generated: {len(trend_predictions)} predictions, {len(emerging_trends_raw)} emerging trends")
+                    if trend_predictions:
+                        print(f"   ✅ First prediction: {trend_predictions[0].get('keyword')}, peak_day={trend_predictions[0].get('peak_day')}")
+                    
+                    # Enhance recommendations with predictions
+                    if trend_predictions:
+                        prediction_map = {p['keyword']: p for p in trend_predictions}
+                        for rec in recommendations:
+                            keyword = rec.get('keyword')
+                            if keyword in prediction_map:
+                                pred_data = prediction_map[keyword]
+                                # Add full prediction data to recommendation
+                                rec['prediction'] = {
+                                    'trend_direction': pred_data.get('trend_direction'),
+                                    'trend_strength': pred_data.get('trend_strength'),
+                                    'confidence': pred_data.get('confidence'),
+                                    'peak_day': pred_data.get('peak_day'),
+                                    'peak_score': pred_data.get('peak_score'),
+                                    'summary': pred_data.get('summary', ''),
+                                    'predictions': pred_data.get('predictions', [])[:7]  # 7-day forecast
+                                }
+                                # Update final score with prediction
+                                if 'final_score' not in rec:
+                                    rec['final_score'] = rec.get('match_score', 0)
+                                # Add prediction bonus to final score
+                                if pred_data.get('trend_direction') == 'rising' and pred_data.get('confidence', 0) > 70:
+                                    rec['final_score'] = min(100, rec['final_score'] * 1.1)  # 10% bonus
+                                    rec['urgency'] = 'urgent' if pred_data.get('peak_day', 7) <= 3 else 'high'
+                    
+                    # Process emerging trends
+                    if emerging_trends_raw:
+                        emerging_trends = []
+                        for trend in emerging_trends_raw:
+                            # Calculate urgency score
+                            base_score = trend.get('confidence', 0) * trend.get('trend_strength', 0) / 100
+                            peak_day = trend.get('peak_day')
+                            urgency = base_score
+                            if peak_day and peak_day <= 3:
+                                urgency = min(100, base_score * 1.5)
+                            elif peak_day and peak_day <= 5:
+                                urgency = min(100, base_score * 1.2)
+                            
+                            emerging_trends.append({
+                                'keyword': trend.get('keyword'),
+                                'confidence': trend.get('confidence', 0),
+                                'trend_strength': trend.get('trend_strength', 0),
+                                'peak_day': trend.get('peak_day'),
+                                'peak_score': trend.get('peak_score'),
+                                'summary': trend.get('summary', ''),
+                                'urgency': urgency
+                            })
+                    else:
+                        # Extract emerging trends from predictions if not provided
+                        emerging_trends = []
+                        if trend_predictions:
+                            for pred in trend_predictions:
+                                if (pred.get('trend_direction') == 'rising' and 
+                                    pred.get('confidence', 0) >= 70 and 
+                                    pred.get('trend_strength', 0) > 50):
+                                    base_score = pred.get('confidence', 0) * pred.get('trend_strength', 0) / 100
+                                    peak_day = pred.get('peak_day')
+                                    urgency = base_score
+                                    if peak_day and peak_day <= 3:
+                                        urgency = min(100, base_score * 1.5)
+                                    elif peak_day and peak_day <= 5:
+                                        urgency = min(100, base_score * 1.2)
+                                    
+                                    emerging_trends.append({
+                                        'keyword': pred['keyword'],
+                                        'confidence': pred['confidence'],
+                                        'trend_strength': pred['trend_strength'],
+                                        'peak_day': pred.get('peak_day'),
+                                        'peak_score': pred.get('peak_score'),
+                                        'summary': pred.get('summary', ''),
+                                        'urgency': urgency
+                                    })
+                    
+                    print(f"   ✅ Predictions generated: {len(trend_predictions)} keywords, {len(emerging_trends) if emerging_trends else 0} emerging trends")
+                else:
+                    print("   ℹ️ No keywords for prediction")
+            except Exception as e:
+                print(f"   ⚠️ Prediction error: {e}")
+                import traceback
+                traceback.print_exc()
+            finally:
+                prediction_time = (datetime.utcnow() - step_start).total_seconds()
+                print(f"   ⏱️  Predictions: {prediction_time:.2f}s")
+        elif request.enable_predictions:
+            if not PROPHET_AVAILABLE:
+                print("   ℹ️ Prophet not available, skipping predictions")
+            elif not trend_predictor:
+                print("   ℹ️ Trend predictor not initialized, skipping predictions")
+        
         total_time = (datetime.utcnow() - start_time).total_seconds()
         print(f"✅ Analysis complete in {total_time:.1f}s!")
         
         response = {
             "success": True,
-            "version": "2.0.1-quickfix",
+            "version": "3.0.0" if PROPHET_AVAILABLE else "2.0.1-quickfix",
             "channel_analysis": {
                 "topics": channel_analysis.get('topics', [])[:15],
                 "content_style": channel_analysis.get('content_style', {}),
@@ -523,12 +696,14 @@ async def full_analysis(request: FullAnalysisRequest):
                 "total_recommendations": len(recommendations),
                 "urgent_count": sum(1 for r in recommendations if r.get('urgency') == 'urgent'),
                 "high_match_count": sum(1 for r in recommendations if r.get('match_score', 0) > 75),
-                "avg_match_score": sum(r.get('match_score', 0) for r in recommendations) / len(recommendations) if recommendations else 0
+                "avg_match_score": sum(r.get('match_score', 0) for r in recommendations) / len(recommendations) if recommendations else 0,
+                "predicted_rising_count": sum(1 for r in recommendations if r.get('prediction', {}).get('trend_direction') == 'rising') if request.enable_predictions else 0
             },
             "performance": {
                 "analysis_time_seconds": total_time,
                 "simple_mode": request.use_simple_mode,
-                "backtest_enabled": request.enable_backtest
+                "backtest_enabled": request.enable_backtest,
+                "predictions_enabled": request.enable_predictions and PROPHET_AVAILABLE
             },
             "analyzed_at": datetime.utcnow().isoformat()
         }
@@ -541,6 +716,15 @@ async def full_analysis(request: FullAnalysisRequest):
             # Always include backtest status, even if no results
             response["backtest"] = None
             response["backtest_status"] = backtest_status
+        
+        # Add trend predictions and emerging trends (MVP 3.0)
+        # Always include these fields, even if empty, for frontend consistency
+        if request.enable_predictions and PROPHET_AVAILABLE:
+            response["trend_predictions"] = trend_predictions if trend_predictions else []
+            response["emerging_trends"] = emerging_trends if emerging_trends else []
+        else:
+            response["trend_predictions"] = []
+            response["emerging_trends"] = []
         
         return response
     
@@ -562,7 +746,7 @@ async def quick_analysis(videos: List[Dict], channel_data: Dict):
         
         return {
             "success": True,
-            "version": "2.0.1-quickfix",
+            "version": "3.0.0" if PROPHET_AVAILABLE else "2.0.1-quickfix",
             "channel_analysis": {
                 "topics": analysis.get('topics', [])[:15],
                 "content_style": analysis.get('content_style', {}),
@@ -593,12 +777,12 @@ async def health_check():
                  (hasattr(social_aggregator, 'cache') and 
                  hasattr(social_aggregator.cache, 'redis_client') and 
                  social_aggregator.cache.redis_client is not None),
-        "prophet": False  # MVP 2.0: Prophet not available
+        "prophet": PROPHET_AVAILABLE and trend_predictor is not None
     }
     
     return {
         "status": "healthy",
-        "version": "2.0.1-quickfix",
+        "version": "3.0.0" if PROPHET_AVAILABLE else "2.0.1-quickfix",
         "timestamp": datetime.utcnow().isoformat(),
         "capabilities": {
             "nlp_analysis": True,
@@ -609,7 +793,7 @@ async def health_check():
             "rate_limiting": True,
             "caching": True,
             "cross_platform_verification": True,
-            # MVP 2.0: No time series prediction
+            "time_series_prediction": PROPHET_AVAILABLE and trend_predictor is not None,
         },
         "services": social_status,
         "warnings": [
@@ -620,13 +804,112 @@ async def health_check():
     }
 
 
-# MVP 2.0: No Prophet prediction endpoints
+# ==================== MVP 3.0: Prophet Prediction Endpoints ====================
+
+@app.get("/api/v3/debug-runtime")
+async def debug_runtime():
+    """
+    🔧 Debug endpoint to verify runtime environment and loaded trend predictor code.
+    """
+    try:
+        import sys
+        import inspect
+        from services import trend_predictor as trend_predictor_module
+
+        confidence_src = inspect.getsource(
+            trend_predictor_module.TrendPredictionEngine._calculate_prediction_confidence
+        ).splitlines()
+
+        return {
+            "success": True,
+            "sys_executable": sys.executable,
+            "trend_predictor_module_file": getattr(trend_predictor_module, "__file__", None),
+            "prophet_available": bool(PROPHET_AVAILABLE and trend_predictor is not None),
+            "confidence_fn_head": confidence_src[:25],
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+@app.post("/api/v3/predict-trends")
+async def predict_trends(request: TrendPredictionRequest):
+    """
+    🔮 MVP 3.0: Predict future trends using Prophet time series forecasting
+    
+    Returns 7-day forecast with confidence intervals, trend direction, and peak timing
+    """
+    if not PROPHET_AVAILABLE or not trend_predictor:
+        raise HTTPException(
+            status_code=503,
+            detail="Prophet prediction engine not available. Install: pip install prophet"
+        )
+    
+    try:
+        print(f"🔮 Predicting trends for {len(request.keywords)} keywords...")
+        
+        # Use sync method in thread (Prophet is CPU-bound)
+        result = await asyncio.to_thread(
+            trend_predictor.predict_trends,
+            request.keywords,
+            request.forecast_days
+        )
+        
+        return {
+            "success": True,
+            "predictions": result.get('predictions', []),
+            "emerging_trends": result.get('emerging_trends', []),
+            "forecast_days": request.forecast_days,
+            "generated_at": datetime.utcnow().isoformat()
+        }
+    
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
+
+
+@app.post("/api/v3/store-trend-data")
+async def store_trend_data(request: StoreTrendDataRequest):
+    """
+    🔮 MVP 3.0: Store current trend data for future predictions
+    
+    This endpoint allows you to store historical trend data that will be used
+    to improve future predictions. Data is stored in the database configured
+    via DATABASE_URL environment variable.
+    """
+    if not trend_predictor:
+        raise HTTPException(
+            status_code=503,
+            detail="Trend predictor not initialized"
+        )
+    
+    try:
+        await trend_predictor.store_trend_data(request.keyword, request.data)
+        
+        return {
+            "success": True,
+            "message": f"Trend data stored for '{request.keyword}'",
+            "stored_at": datetime.utcnow().isoformat()
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Storage failed: {str(e)}")
 
 
 if __name__ == "__main__":
     import uvicorn
-    print("🚀 Starting TrendForge Backend (Quick Fix Version)")
-    print("   - Disabled: Transcript analysis, Backtest")
+    version_str = "MVP 3.0 (Prophet)" if PROPHET_AVAILABLE else "MVP 2.0"
+    print(f"🚀 Starting TrendForge Backend ({version_str})")
+    if PROPHET_AVAILABLE:
+        print("   ✅ Prophet time series prediction enabled")
+        print("   ✅ Predictive recommendations enabled")
+    else:
+        print("   ⚠️ Prophet not available, using MVP 2.0 features")
+    print("   - Features: Deep analysis, Social trends, Recommendations, Backtest")
     print("   - Optimized: Social media collection with timeouts")
     print("   - New: Simple mode for faster analysis")
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")

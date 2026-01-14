@@ -145,6 +145,7 @@ export async function POST(request: NextRequest) {
           analyze_transcripts: false, // Set to true for deeper analysis (slower)
           max_recommendations: 10, // 恢复推荐数量
           enable_backtest: true, // 启用回测分析 (MVP 2.0)
+          enable_predictions: true, // MVP 3.0: 启用 Prophet 预测
           use_simple_mode: false, // 标准模式：包含社交媒体收集（但会快速失败）
         }),
       });
@@ -207,6 +208,8 @@ export async function POST(request: NextRequest) {
             backtest: backendData.backtest || null, // 保存回测结果 (MVP 2.0)
             backtest_status: backendData.backtest_status || null, // 保存回测状态
             social_trends: backendData.social_trends || {}, // 保存社交媒体趋势
+            trend_predictions: Array.isArray(backendData.trend_predictions) ? backendData.trend_predictions : [], // MVP 3.0: Prophet 趋势预测 (确保是数组)
+            emerging_trends: Array.isArray(backendData.emerging_trends) ? backendData.emerging_trends : [], // MVP 3.0: 新兴趋势 (确保是数组)
           },
         },
         nicheKeywords: backendData.channel_analysis.topics
@@ -228,6 +231,8 @@ export async function POST(request: NextRequest) {
             backtest: backendData.backtest || null, // 保存回测结果 (MVP 2.0)
             backtest_status: backendData.backtest_status || null, // 保存回测状态
             social_trends: backendData.social_trends || {}, // 保存社交媒体趋势
+            trend_predictions: Array.isArray(backendData.trend_predictions) ? backendData.trend_predictions : [], // MVP 3.0: Prophet 趋势预测 (确保是数组)
+            emerging_trends: Array.isArray(backendData.emerging_trends) ? backendData.emerging_trends : [], // MVP 3.0: 新兴趋势 (确保是数组)
           },
         },
         nicheKeywords: backendData.channel_analysis.topics
@@ -301,6 +306,8 @@ export async function POST(request: NextRequest) {
               suggestedTitles: rec.suggested_titles,
               sources: rec.sources,
               relatedInfo: rec.related_info,
+              // MVP 3.0: Save prediction data if available
+              prediction: rec.prediction || null,
             },
           },
         });
@@ -321,6 +328,8 @@ export async function POST(request: NextRequest) {
           suggestedTitles: rec.suggested_titles,
           sources: rec.sources,
           relatedInfo: rec.related_info,
+          // MVP 3.0: Include prediction data
+          prediction: rec.prediction || null,
         };
       })
     );
@@ -348,7 +357,9 @@ export async function POST(request: NextRequest) {
       summary: backendData.summary,
       backtest: backendData.backtest || null, // 回测结果（已保存到fingerprint中）
       backtest_status: backendData.backtest_status || null, // 回测状态信息
-      // MVP 2.0: No trend predictions (Prophet not available)
+      trendPredictions: backendData.trend_predictions || [], // MVP 3.0: Prophet 趋势预测 (确保是数组)
+      emergingTrends: backendData.emerging_trends || [], // MVP 3.0: 新兴趋势 (确保是数组)
+      predictionsEnabled: backendData.performance?.predictions_enabled || false, // MVP 3.0: 预测功能状态
     });
   } catch (error: any) {
     console.error('Analysis error:', error);

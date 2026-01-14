@@ -182,14 +182,14 @@ export default function TrendPredictionChart({ prediction, showAccuracy = false 
       </div>
 
       {/* Peak Info */}
-      {prediction.peak_day && (
+      {prediction.peak_day != null && prediction.peak_day > 0 && (
         <div className="bg-yellow-600/10 border border-yellow-600/30 rounded-lg p-4 mb-4">
           <div className="flex items-center gap-3">
             <Target className="w-5 h-5 text-yellow-400" />
             <div className="flex-1">
               <div className="text-yellow-300 font-semibold">预计峰值</div>
               <div className="text-white text-sm">
-                第{prediction.peak_day}天达到峰值 ({prediction.peak_score.toFixed(1)}分)
+                第{prediction.peak_day}天达到峰值 ({prediction.peak_score?.toFixed(1) || 'N/A'}分)
               </div>
             </div>
             <Zap className="w-6 h-6 text-yellow-400" />

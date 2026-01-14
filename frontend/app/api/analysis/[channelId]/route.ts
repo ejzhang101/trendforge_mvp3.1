@@ -42,6 +42,119 @@ export async function GET(
     const fingerprint = channel.fingerprint as any;
     const v2Analysis = fingerprint?.v2_analysis || {};
     const backtestData = v2Analysis?.backtest || null;
+
+    // ==================== MVP 3.0: Auto-refresh predictions (confidence >= 75) ====================
+    const PREDICTIONS_MIN_CONFIDENCE = 75;
+    const PREDICTIONS_ALGO_VERSION = '2026-01-14-75plus';
+    const backendBaseUrl = process.env.BACKEND_SERVICE_URL || 'http://localhost:8000';
+
+    let trendPredictions = Array.isArray(v2Analysis?.trend_predictions)
+      ? v2Analysis.trend_predictions
+      : (v2Analysis?.trend_predictions ? [v2Analysis.trend_predictions] : []);
+    let emergingTrends = Array.isArray(v2Analysis?.emerging_trends)
+      ? v2Analysis.emerging_trends
+      : (v2Analysis?.emerging_trends ? [v2Analysis.emerging_trends] : []);
+
+    const storedAlgoVersion = v2Analysis?.predictions_algo_version || null;
+    const storedMinConfidence = trendPredictions.length > 0
+      ? Math.min(...trendPredictions.map((p: any) => Number(p?.confidence ?? 0)))
+      : null;
+
+    const shouldRefreshPredictions =
+      (storedMinConfidence != null && storedMinConfidence < PREDICTIONS_MIN_CONFIDENCE) ||
+      (storedAlgoVersion != null && storedAlgoVersion !== PREDICTIONS_ALGO_VERSION);
+
+    if (shouldRefreshPredictions) {
+      try {
+        const keywords = channel.trends
+          .map((ct) => ct.trend?.keyword)
+          .filter(Boolean)
+          .slice(0, 5) as string[];
+
+        if (keywords.length > 0) {
+          console.log('🔄 Refreshing stored trend predictions...', {
+            channelId: channel.channelId,
+            storedAlgoVersion,
+            targetAlgoVersion: PREDICTIONS_ALGO_VERSION,
+            storedMinConfidence,
+            targetMinConfidence: PREDICTIONS_MIN_CONFIDENCE,
+            keywords,
+          });
+
+          const resp = await fetch(`${backendBaseUrl}/api/v3/predict-trends`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ keywords, forecast_days: 7 }),
+          });
+
+          if (resp.ok) {
+            const predJson = await resp.json();
+            if (predJson?.success) {
+              trendPredictions = Array.isArray(predJson.predictions) ? predJson.predictions : [];
+              emergingTrends = Array.isArray(predJson.emerging_trends) ? predJson.emerging_trends : [];
+
+              // Persist refreshed predictions into fingerprint
+              await prisma.channel.update({
+                where: { channelId: channel.channelId },
+                data: {
+                  fingerprint: {
+                    ...(fingerprint || {}),
+                    v2_analysis: {
+                      ...(v2Analysis || {}),
+                      trend_predictions: trendPredictions,
+                      emerging_trends: emergingTrends,
+                      predictions_algo_version: PREDICTIONS_ALGO_VERSION,
+                      predictions_enabled: true,
+                    },
+                  },
+                },
+              });
+
+              // Update stored recommendationData.prediction for top trends so purple cards can show peak info
+              const predictionMap = new Map<string, any>(
+                trendPredictions.map((p: any) => [p.keyword, p])
+              );
+
+              await Promise.all(
+                channel.trends.map(async (ct) => {
+                  const kw = ct.trend?.keyword;
+                  const pred = kw ? predictionMap.get(kw) : null;
+                  if (!kw || !pred) return;
+
+                  const recData = (ct.recommendationData as any) || {};
+                  await prisma.channelTrend.update({
+                    where: { id: ct.id },
+                    data: {
+                      recommendationData: {
+                        ...recData,
+                        prediction: {
+                          trend_direction: pred.trend_direction,
+                          trend_strength: pred.trend_strength,
+                          confidence: pred.confidence,
+                          peak_day: pred.peak_day,
+                          peak_score: pred.peak_score,
+                          summary: pred.summary,
+                          predictions: Array.isArray(pred.predictions) ? pred.predictions.slice(0, 7) : [],
+                        },
+                      },
+                    },
+                  });
+                })
+              );
+
+              console.log('✅ Refreshed predictions saved', {
+                trendPredictionsCount: trendPredictions.length,
+                emergingTrendsCount: emergingTrends.length,
+              });
+            }
+          } else {
+            console.log('⚠️ Prediction refresh failed (backend response not ok)', { status: resp.status });
+          }
+        }
+      } catch (e) {
+        console.log('⚠️ Prediction refresh error (non-fatal):', e);
+      }
+    }
     
     // Debug: Log backtest data availability
     console.log('📊 Backtest data check:', {
@@ -172,13 +285,15 @@ export async function GET(
           },
         ],
         sources: recData?.sources || ['database'],
-        relatedInfo: recData?.relatedInfo || {
-          rising_queries: trendData.relatedKeywords || [],
-          hashtags: [],
-          subreddits: [],
-        },
-      };
-    });
+          relatedInfo: recData?.relatedInfo || {
+            rising_queries: trendData.relatedKeywords || [],
+            hashtags: [],
+            subreddits: [],
+          },
+          // MVP 3.0: Add prediction data if available
+          prediction: recData?.prediction || null,
+        };
+      });
 
     // 如果没有推荐数据，从频道主题生成基础推荐
     if (recommendations.length === 0 && v2Analysis.topics && v2Analysis.topics.length > 0) {
@@ -291,7 +406,9 @@ export async function GET(
         meets_requirements: channel.videoCount >= 10,
         status: backtestData ? "success" : (channel.videoCount < 10 ? "insufficient_videos" : "not_run")
       }, // 回测状态信息
-      trendPredictions: v2Analysis?.trend_predictions || null, // 趋势预测数据
+      trendPredictions, // MVP 3.0: Prophet 趋势预测数据（可能已自动刷新）
+      emergingTrends, // MVP 3.0: 新兴趋势数据（可能已自动刷新）
+      predictionsEnabled: v2Analysis?.predictions_enabled || shouldRefreshPredictions || false, // MVP 3.0: 预测功能状态
     });
   } catch (error: any) {
     console.error('Error fetching analysis:', error);

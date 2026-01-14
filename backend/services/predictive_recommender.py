@@ -471,26 +471,82 @@ class PredictiveRecommendationEngine:
     
     def _predict_performance(self, match_score, viral, performance, 
                             relevance, high_performers) -> Dict:
-        """性能预测"""
-        median_views = high_performers.get('median_views', 10000) if high_performers else 10000
-        avg_views = high_performers.get('avg_views', 10000) if high_performers else 10000
+        """
+        性能预测 - 优化算法，避免数据失真
         
-        # Use weighted average
+        使用多因素动态计算，确保预测值合理
+        """
+        # 获取基准播放量
+        if high_performers:
+            median_views = high_performers.get('median_views', 0) or high_performers.get('median_views', 10000)
+            avg_views = high_performers.get('avg_views', 0) or high_performers.get('avg_views', 10000)
+        else:
+            median_views = 10000
+            avg_views = 10000
+        
+        # 使用加权平均作为基准（中位数70% + 平均值30%）
         base_views = median_views * 0.7 + avg_views * 0.3
         
-        # Multiplier based on match score
-        multiplier = 0.8 + (match_score / 100) * 1.2
-        predicted_views = int(base_views * multiplier)
+        # 确保基准值合理（至少1000，最多1000万）
+        base_views = max(1000, min(10000000, base_views))
         
+        # 多因素系数计算
+        # 1. 热度系数（基于互联网热度）
+        viral_multiplier = 1.0
+        if viral >= 90:
+            viral_multiplier = 2.5  # 爆火话题
+        elif viral >= 70:
+            viral_multiplier = 2.0  # 热门话题
+        elif viral >= 50:
+            viral_multiplier = 1.5  # 上升话题
+        else:
+            viral_multiplier = 1.0  # 正常
+        
+        # 2. 相关性系数（基于内容相关性）
+        relevance_multiplier = 0.7 + (relevance / 100) * 0.6  # 0.7-1.3
+        
+        # 3. 表现潜力系数（基于表现潜力）
+        performance_multiplier = 0.8 + (performance / 100) * 0.7  # 0.8-1.5
+        
+        # 4. 时效性系数（基于匹配分数）
+        timeliness_multiplier = 0.9 + (match_score / 100) * 0.3  # 0.9-1.2
+        
+        # 5. 频道稳定性系数（基于历史表现）
+        channel_stability = 1.0
+        if high_performers and high_performers.get('std_views'):
+            std_views = high_performers.get('std_views', 0)
+            if std_views > 0 and avg_views > 0:
+                cv = std_views / avg_views  # 变异系数
+                # 稳定性越高，系数越高（0.95-1.1）
+                channel_stability = 0.95 + min(0.15, (1 - min(1, cv)) * 0.15)
+        
+        # 6. 标题优化系数（小幅提升）
+        title_optimization = 0.98 + (match_score / 100) * 0.07  # 0.98-1.05
+        
+        # 7. 置信度因子（基于预测置信度，如果有）
+        confidence_factor = 0.8 + (match_score / 100) * 0.3  # 0.8-1.1
+        
+        # 综合计算预测播放量
+        predicted_views = base_views * viral_multiplier * relevance_multiplier * \
+                         performance_multiplier * timeliness_multiplier * \
+                         channel_stability * title_optimization * confidence_factor
+        
+        # 确保预测值在合理范围内（1000 - 5000万）
+        predicted_views = max(1000, min(50000000, int(predicted_views)))
+        
+        # 确定表现等级
         if match_score >= 80:
             tier = 'excellent'
             description = "预计表现优异，可能成为爆款"
         elif match_score >= 65:
             tier = 'good'
             description = "预计表现良好，高于平均水平"
-        else:
+        elif match_score >= 50:
             tier = 'moderate'
             description = "预计表现中等，稳定流量"
+        else:
+            tier = 'low'
+            description = "预计表现一般，可作为尝试"
         
         return {
             'tier': tier,

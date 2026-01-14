@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.0.0] - 2026-01-14
+
+### Added
+- **Prophet 预测能力 (MVP 3.0)**:
+  - `POST /api/v3/predict-trends` 7天趋势预测（趋势方向、峰值时机、置信区间、准确度指标）
+  - `GET /api/v3/debug-runtime` 本地调试端点：验证运行时加载的预测代码与 python 环境
+- **预测落库自动刷新**（解决旧数据仍显示低置信度的问题）:
+  - `GET /api/analysis/[channelId]` 检测到旧预测低于阈值或算法版本变化时，自动调用后端重新生成并写回 DB
+  - 同步更新 `ChannelTrend.recommendationData.prediction`，保证推荐卡片展示峰值信息
+- **MVP 3.0 文档**:
+  - `docs/ARCHITECTURE_V3.0.0.md`
+  - `docs/MVP3.0.0_RELEASE_NOTES.md`
+  - `docs/RUNTIME_LOGS_MVP3.0.0_LOCALHOST_2026-01-14.md`
+
+### Changed
+- **Prophet 置信度算法与阈值策略**:
+  - 服务端置信度用于产品展示与行动建议，目标 **≥75%**
+  - 新兴趋势识别阈值提升至 75%
+- **前端展示稳定性**:
+  - 修复 `peak_day`/`peak_score` 的空值渲染与条件判断，确保峰值信息稳定展示
+
+### Fixed
+- 修复“前端仍显示旧置信度（如 55%）”：
+  - 原因为 DB 缓存/旧 fingerprint 数据未更新
+  - 通过自动 refresh 机制确保前端读到最新预测
+
+---
+
 ## [2.0.1] - 2026-01-13
 
 ### Added

@@ -51,6 +51,14 @@ interface Recommendation {
     hashtags: string[];
     subreddits: string[];
   };
+  prediction?: {  // MVP 3.0: Prophet 预测数据
+    trend_direction: 'rising' | 'falling' | 'stable';
+    trend_strength: number;
+    confidence: number;
+    peak_day: number | null;
+    peak_score: number;
+    summary: string;
+  };
 }
 
 export default function AnalysisPageV2() {
@@ -71,6 +79,19 @@ export default function AnalysisPageV2() {
         throw new Error(`HTTP error! status: ${res.status}`);
       }
       const result = await res.json();
+      
+      // Debug: Log prediction data
+      console.log('📊 Analysis data received:', {
+        hasTrendPredictions: !!result.trendPredictions,
+        trendPredictionsCount: result.trendPredictions?.length || 0,
+        hasEmergingTrends: !!result.emergingTrends,
+        emergingTrendsCount: result.emergingTrends?.length || 0,
+        recommendationsWithPrediction: result.recommendations?.filter((r: any) => r.prediction?.peak_day).length || 0,
+        firstPrediction: result.trendPredictions?.[0],
+        firstEmergingTrend: result.emergingTrends?.[0],
+        firstRecommendation: result.recommendations?.[0]
+      });
+      
       setData(result);
     } catch (error) {
       console.error('Failed to fetch:', error);
@@ -400,13 +421,16 @@ export default function AnalysisPageV2() {
           </>
         )}
 
-        {/* Trend Predictions Section */}
+        {/* MVP 3.0: Trend Predictions Section */}
         {data.trendPredictions && data.trendPredictions.length > 0 && (
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
               <TrendingUp className="w-6 h-6 text-purple-400" />
-              🔮 趋势预测分析
+              🔮 7天趋势预测 - Prophet 时间序列模型
             </h2>
+            <p className="text-purple-300 text-sm mb-6">
+              基于 Prophet 时间序列模型预测未来7天的趋势变化，包含趋势方向检测、峰值时机预测、95%置信区间和模型准确度指标
+            </p>
             <div className="space-y-6">
               {data.trendPredictions.map((prediction: any, idx: number) => (
                 <TrendPredictionChart
@@ -418,6 +442,65 @@ export default function AnalysisPageV2() {
             </div>
           </div>
         )}
+
+        {/* MVP 3.0: Emerging Trends Section */}
+        {(() => {
+          const trends = Array.isArray(data.emergingTrends) ? data.emergingTrends : [];
+          if (trends.length === 0) {
+            console.log('⚠️ No emerging trends to display');
+            return null;
+          }
+          return (
+          <div className="bg-gradient-to-br from-yellow-600/20 to-orange-600/20 rounded-2xl p-6 mb-8 border border-yellow-500/30">
+            <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+              <Zap className="w-6 h-6 text-yellow-400" />
+              ⚡ 新兴趋势识别 - 即将爆发的话题
+            </h2>
+            <p className="text-purple-300 text-sm mb-6">
+              基于 Prophet 预测模型识别的高置信度上升趋势话题，建议优先关注
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {trends.map((trend: any, idx: number) => {
+                console.log(`📊 Rendering emerging trend ${idx}:`, {
+                  keyword: trend.keyword,
+                  peak_day: trend.peak_day,
+                  peak_score: trend.peak_score,
+                  hasPeakDay: trend.peak_day != null && trend.peak_day > 0
+                });
+                return (
+                  <div
+                    key={idx}
+                    className="bg-white/10 rounded-xl p-4 border border-yellow-500/20"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-lg font-semibold text-white">{trend.keyword}</h3>
+                      <span className="px-2 py-1 bg-yellow-500/30 text-yellow-200 rounded text-xs font-semibold">
+                        紧急度: {trend.urgency?.toFixed(0) || 'N/A'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm mb-2">
+                      <span className="text-purple-300">
+                        置信度: <span className="font-semibold text-green-400">{trend.confidence?.toFixed(0) || 'N/A'}%</span>
+                      </span>
+                      <span className="text-purple-300">
+                        趋势强度: <span className="font-semibold text-yellow-400">{trend.trend_strength?.toFixed(0) || 'N/A'}</span>
+                      </span>
+                    </div>
+                    {trend.peak_day != null && trend.peak_day > 0 && (
+                      <p className="text-xs text-yellow-300">
+                        🎯 预计第{trend.peak_day}天达到峰值
+                      </p>
+                    )}
+                    {trend.summary && (
+                      <p className="text-xs text-purple-200 mt-2 italic">{trend.summary}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          );
+        })()}
 
         {/* Recommendations Section */}
         <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 mb-8 border border-white/20">
@@ -518,6 +601,33 @@ export default function AnalysisPageV2() {
                       </div>
                     </div>
                   </div>
+
+                  {/* MVP 3.0: Prophet Prediction Info */}
+                  {rec.prediction && (
+                    <div className="bg-gradient-to-r from-purple-600/20 to-blue-600/20 rounded-lg p-3 mb-3 border border-purple-500/30">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Target className="w-4 h-4 text-purple-400" />
+                        <span className="text-sm font-semibold text-purple-300">🔮 趋势预测</span>
+                        {rec.prediction.trend_direction === 'rising' && (
+                          <TrendingUp className="w-4 h-4 text-green-400" />
+                        )}
+                        {rec.prediction.trend_direction === 'falling' && (
+                          <TrendingDown className="w-4 h-4 text-red-400" />
+                        )}
+                      </div>
+                      <p className="text-xs text-purple-200 mb-2">{rec.prediction.summary}</p>
+                      <div className="flex items-center gap-4 text-xs">
+                        <span className="text-purple-300">
+                          置信度: <span className="font-semibold text-purple-200">{rec.prediction.confidence?.toFixed(0) || 'N/A'}%</span>
+                        </span>
+                        {rec.prediction?.peak_day != null && rec.prediction.peak_day > 0 && (
+                          <span className="text-yellow-300">
+                            峰值: 第{rec.prediction.peak_day}天 ({rec.prediction.peak_score?.toFixed(0) || 'N/A'}分)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* AI Reasoning */}
                   <p className="text-sm text-purple-200 mb-3 italic">💡 {rec.reasoning}</p>
