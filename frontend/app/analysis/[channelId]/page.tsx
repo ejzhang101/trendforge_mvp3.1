@@ -19,6 +19,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import TrendPredictionChart from '@/components/TrendPredictionChart';
+import ScriptGenerator from '@/components/ScriptGenerator';
 
 interface Recommendation {
   id: string;
@@ -69,7 +70,7 @@ export default function AnalysisPageV2() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
   const [selectedRec, setSelectedRec] = useState<Recommendation | null>(null);
-  const [activeTab, setActiveTab] = useState<'details' | 'prediction'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'prediction' | 'script'>('details');
   const [error, setError] = useState<string | null>(null);
   const fetchedForChannelIdRef = useRef<string | null>(null);
 
@@ -969,6 +970,16 @@ export default function AnalysisPageV2() {
                         <span className="ml-2 text-xs text-purple-400">(暂无数据)</span>
                       )}
                     </button>
+                    <button
+                      onClick={() => setActiveTab('script')}
+                      className={`px-4 py-2 font-semibold transition-all ${
+                        activeTab === 'script'
+                          ? 'text-white border-b-2 border-purple-400'
+                          : 'text-purple-300 hover:text-white'
+                      }`}
+                    >
+                      ✍️ AI 脚本生成
+                    </button>
                   </div>
                 </div>
 
@@ -1074,7 +1085,7 @@ export default function AnalysisPageV2() {
                   </div>
                 )}
                     </div>
-                  ) : (
+                  ) : activeTab === 'prediction' ? (
                     /* Prediction Tab */
                     <div>
                       {fullPrediction ? (
@@ -1091,6 +1102,14 @@ export default function AnalysisPageV2() {
                           </p>
                         </div>
                       )}
+                    </div>
+                  ) : (
+                    /* Script Generation Tab */
+                    <div>
+                      <ScriptGenerator
+                        channelAnalysis={data.analysis || {}}
+                        recommendations={data.recommendations || []}
+                      />
                     </div>
                   )}
                 </div>

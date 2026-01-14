@@ -32,6 +32,18 @@
 ### 3. Google Trends - 无需配置
 Google Trends 不需要 API keys，可以直接使用。
 
+### 4. OpenAI API - 可选（用于智能脚本生成）
+如果你想要使用 AI 语义分析和智能脚本生成功能，请配置 OpenAI API：
+
+1. 访问 https://platform.openai.com/api-keys
+2. 创建新的 API Key
+3. 在 `backend/.env` 文件中添加：
+   ```
+   OPENAI_API_KEY=your_openai_api_key_here
+   ```
+
+**注意**: 如果没有配置，系统会使用模板方式生成脚本（功能仍然可用，但不够智能）
+
 ## 配置步骤
 
 1. 在 `backend` 目录下创建 `.env` 文件（如果还没有）：

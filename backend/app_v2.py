@@ -106,10 +106,20 @@ from services.backtest_analyzer import BacktestAnalyzer
 backtest_analyzer = BacktestAnalyzer(recommendation_engine, social_aggregator)
 print("✅ Backtest Analyzer loaded (MVP 2.0)")
 
+# Initialize script generator (MVP 3.0 feature)
+try:
+    from services.script_generator import script_generator
+    SCRIPT_GENERATOR_AVAILABLE = True
+    print("✅ Script Generator loaded (MVP 3.0)")
+except ImportError:
+    script_generator = None
+    SCRIPT_GENERATOR_AVAILABLE = False
+    print("⚠️ Script Generator not available")
+
 app = FastAPI(
-    title="TrendForge AI Backend - MVP 3.0 (Prophet)",
-    version="3.0.0",
-    description="Intelligent YouTube trend prediction with deep content analysis"
+    title="TrendForge AI Backend - MVP 3.1 (Prophet + LLM Script Generation)",
+    version="3.1.0",
+    description="Intelligent YouTube trend prediction with deep content analysis and AI-powered script generation"
 )
 
 # CORS
@@ -188,6 +198,16 @@ class FullAnalysisRequest(BaseModel):
     use_simple_mode: bool = False  # 简单模式：跳过社交趋势收集（默认关闭，使用完整分析）
 
 
+class ScriptGenerationRequest(BaseModel):
+    """
+    Request model for video script generation (MVP 3.0)
+    """
+    user_prompt: str  # 用户输入的产品/服务描述
+    channel_analysis: Dict  # 频道分析数据
+    recommendations: List[Dict]  # AI 推荐的话题列表
+    count: int = 3  # 生成脚本数量
+
+
 # ==================== API Endpoints ====================
 
 @app.get("/")
@@ -212,9 +232,13 @@ async def root():
             "🔮 Confidence intervals (95%)"
         ])
     
+    # Add script generation feature if available
+    if SCRIPT_GENERATOR_AVAILABLE:
+        features.append("✍️ Intelligent video script generation")
+    
     return {
         "service": "TrendForge AI Backend",
-        "version": "3.0.0" if PROPHET_AVAILABLE else "2.0.1-quickfix",
+        "version": "3.1.0" if PROPHET_AVAILABLE else "2.0.1-quickfix",
         "features": features,
         "status": "running",
         "enhancements": {
@@ -675,7 +699,7 @@ async def full_analysis(request: FullAnalysisRequest):
         
         response = {
             "success": True,
-            "version": "3.0.0" if PROPHET_AVAILABLE else "2.0.1-quickfix",
+            "version": "3.1.0" if PROPHET_AVAILABLE else "2.0.1-quickfix",
             "channel_analysis": {
                 "topics": channel_analysis.get('topics', [])[:15],
                 "content_style": channel_analysis.get('content_style', {}),
@@ -746,7 +770,7 @@ async def quick_analysis(videos: List[Dict], channel_data: Dict):
         
         return {
             "success": True,
-            "version": "3.0.0" if PROPHET_AVAILABLE else "2.0.1-quickfix",
+            "version": "3.1.0" if PROPHET_AVAILABLE else "2.0.1-quickfix",
             "channel_analysis": {
                 "topics": analysis.get('topics', [])[:15],
                 "content_style": analysis.get('content_style', {}),
@@ -777,12 +801,13 @@ async def health_check():
                  (hasattr(social_aggregator, 'cache') and 
                  hasattr(social_aggregator.cache, 'redis_client') and 
                  social_aggregator.cache.redis_client is not None),
-        "prophet": PROPHET_AVAILABLE and trend_predictor is not None
+        "prophet": PROPHET_AVAILABLE and trend_predictor is not None,
+        "script_generator": SCRIPT_GENERATOR_AVAILABLE and script_generator is not None
     }
     
     return {
         "status": "healthy",
-        "version": "3.0.0" if PROPHET_AVAILABLE else "2.0.1-quickfix",
+        "version": "3.1.0" if PROPHET_AVAILABLE else "2.0.1-quickfix",
         "timestamp": datetime.utcnow().isoformat(),
         "capabilities": {
             "nlp_analysis": True,
@@ -794,6 +819,7 @@ async def health_check():
             "caching": True,
             "cross_platform_verification": True,
             "time_series_prediction": PROPHET_AVAILABLE and trend_predictor is not None,
+            "script_generation": SCRIPT_GENERATOR_AVAILABLE and script_generator is not None,
         },
         "services": social_status,
         "warnings": [
@@ -900,9 +926,54 @@ async def store_trend_data(request: StoreTrendDataRequest):
         raise HTTPException(status_code=500, detail=f"Storage failed: {str(e)}")
 
 
+@app.post("/api/v3/generate-scripts")
+async def generate_scripts(request: ScriptGenerationRequest):
+    """
+    ✍️ MVP 3.0: Generate video scripts based on channel analysis and recommendations
+    
+    Generates multiple script variations based on:
+    - User product/service description
+    - Channel analysis (style, audience, high performers)
+    - AI recommendations (topics, match scores, viral potential)
+    
+    Returns scripts with performance predictions and reasoning.
+    """
+    if not SCRIPT_GENERATOR_AVAILABLE or not script_generator:
+        raise HTTPException(
+            status_code=503,
+            detail="Script generator not available"
+        )
+    
+    try:
+        print(f"✍️ Generating {request.count} scripts for prompt: {request.user_prompt[:50]}...")
+        
+        # Use sync method in thread (script generation is CPU-bound)
+        scripts = await asyncio.to_thread(
+            script_generator.generate_scripts,
+            request.user_prompt,
+            request.channel_analysis,
+            request.recommendations,
+            request.count
+        )
+        
+        print(f"   ✅ Generated {len(scripts)} scripts")
+        
+        return {
+            "success": True,
+            "scripts": scripts,
+            "count": len(scripts),
+            "generated_at": datetime.utcnow().isoformat()
+        }
+    
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Script generation failed: {str(e)}")
+
+
 if __name__ == "__main__":
     import uvicorn
-    version_str = "MVP 3.0 (Prophet)" if PROPHET_AVAILABLE else "MVP 2.0"
+    version_str = "MVP 3.1 (Prophet + LLM)" if PROPHET_AVAILABLE else "MVP 2.0"
     print(f"🚀 Starting TrendForge Backend ({version_str})")
     if PROPHET_AVAILABLE:
         print("   ✅ Prophet time series prediction enabled")

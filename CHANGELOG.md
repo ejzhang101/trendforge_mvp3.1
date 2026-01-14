@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.1.0] - 2026-01-14
+
+### Added
+- **LLM 增强的智能脚本生成 (MVP 3.1)**:
+  - 集成 OpenAI GPT-4o-mini 进行语义分析和脚本生成
+  - 支持中英文输入的产品/服务描述解析
+  - 智能提取产品类型、目标客户、核心优势、使用场景、行业领域等结构化信息
+  - 基于频道分析、推荐话题、产品信息生成个性化视频脚本
+  - 自动回退机制：未配置 API Key 或 LLM 调用失败时自动使用模板方式
+- **新增 API 端点**:
+  - `POST /api/v3/generate-scripts` 智能脚本生成（支持 LLM 模式）
+- **新增文档**:
+  - `backend/SCRIPT_GENERATOR_LLM.md` LLM 脚本生成器使用说明
+  - 更新 `backend/API_KEYS_SETUP.md` 添加 OpenAI API 配置说明
+- **前端增强**:
+  - 在推荐话题详情弹窗中新增 "✍️ AI 脚本生成" Tab
+  - 支持用户输入产品描述并生成多个脚本变体
+  - 显示脚本性能预测和推荐理由
+
+### Changed
+- **脚本生成引擎升级**:
+  - `ScriptGeneratorEngine` 支持 LLM 和模板两种模式
+  - 语义分析从基础关键词提取升级为 LLM 结构化提取
+  - 脚本内容从模板填充升级为 LLM 智能生成
+- **依赖更新**:
+  - 添加 `openai>=1.3.0` 到 `requirements_v2.txt`
+- **错误处理增强**:
+  - 完善的 LLM API 调用错误处理
+  - JSON 解析失败自动回退
+  - 详细的错误日志输出
+
+### Technical Details
+- **LLM 模型**: GPT-4o-mini（成本优化）
+- **Token 限制**: 语义分析 500 tokens，脚本生成 2000 tokens
+- **成本估算**: 约 $0.00075 / 脚本生成请求
+- **性能**: LLM 模式响应时间约 3-5 秒，模板模式 < 1 秒
+
+---
+
 ## [3.0.0] - 2026-01-14
 
 ### Added
