@@ -42,6 +42,9 @@
    DATABASE_URL=你的PostgreSQL连接字符串
    PORT=8000
    
+   # MVP 3.1.0 新增：LLM 脚本生成（可选但推荐）
+   OPENAI_API_KEY=你的OpenAI_API_Key
+   
    # 可选变量（如果配置了）
    REDDIT_CLIENT_ID=你的Reddit_Client_ID
    REDDIT_CLIENT_SECRET=你的Reddit_Client_Secret
