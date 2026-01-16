@@ -16,11 +16,29 @@ echo ""
 # 检查 Node.js
 if ! command -v node &> /dev/null; then
     echo "⚠️  Node.js 未找到，尝试加载环境..."
+    
+    # 尝试加载 Homebrew (Apple Silicon)
+    if [ -f /opt/homebrew/bin/brew ]; then
+        eval "$(/opt/homebrew/bin/brew shellenv)"
+    fi
+    
+    # 尝试加载 Homebrew (Intel)
+    if [ -f /usr/local/bin/brew ]; then
+        eval "$(/usr/local/bin/brew shellenv)"
+    fi
+    
+    # 尝试加载 nvm
+    if [ -f ~/.nvm/nvm.sh ]; then
+        source ~/.nvm/nvm.sh
+        nvm use node 2>/dev/null || true
+    fi
+    
+    # 尝试加载 zshrc/bashrc
     if [ -f ~/.zshrc ]; then
-        source ~/.zshrc
+        source ~/.zshrc 2>/dev/null || true
     fi
     if [ -f ~/.bashrc ]; then
-        source ~/.bashrc
+        source ~/.bashrc 2>/dev/null || true
     fi
 fi
 
