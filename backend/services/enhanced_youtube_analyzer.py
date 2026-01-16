@@ -157,33 +157,58 @@ class EnhancedContentAnalyzer:
     def _extract_tfidf_topics(self, titles: List[str]) -> List[Dict]:
         """
         Use TF-IDF to extract important terms, filtered by POS tags
+        Falls back to NLTK-only mode if spaCy or sklearn unavailable
         """
+        # Check if required libraries are available
+        if not SKLEARN_AVAILABLE:
+            return self._extract_nltk_topics(titles)
+        
         # Preprocess: extract nouns and proper nouns only
         processed_titles = []
         for title in titles:
-            doc = nlp(title.lower())
-            # Keep only NOUN, PROPN (proper nouns), and filter stop words
-            tokens = [
-                token.lemma_ for token in doc 
-                if token.pos_ in ['NOUN', 'PROPN'] 
-                and token.text not in self.stop_words
-                and len(token.text) > 2
-                and not token.is_punct
-            ]
-            processed_titles.append(' '.join(tokens))
+            if SPACY_AVAILABLE and nlp:
+                # Use spaCy if available
+                try:
+                    doc = nlp(title.lower())
+                    tokens = [
+                        token.lemma_ for token in doc 
+                        if token.pos_ in ['NOUN', 'PROPN'] 
+                        and token.text not in self.stop_words
+                        and len(token.text) > 2
+                        and not token.is_punct
+                    ]
+                    processed_titles.append(' '.join(tokens))
+                except:
+                    # Fallback to NLTK if spaCy fails
+                    tokens = word_tokenize(title.lower())
+                    pos_tags = pos_tag(tokens)
+                    nouns = [word for word, pos in pos_tags 
+                            if pos.startswith('NN') 
+                            and word not in self.stop_words 
+                            and len(word) > 2]
+                    processed_titles.append(' '.join(nouns))
+            else:
+                # Fallback to NLTK
+                tokens = word_tokenize(title.lower())
+                pos_tags = pos_tag(tokens)
+                nouns = [word for word, pos in pos_tags 
+                        if pos.startswith('NN') 
+                        and word not in self.stop_words 
+                        and len(word) > 2]
+                processed_titles.append(' '.join(nouns))
         
         if not any(processed_titles):
-            return []
+            return self._extract_nltk_topics(titles)
         
         # TF-IDF
-        vectorizer = TfidfVectorizer(
-            max_features=30,
-            ngram_range=(1, 3),  # Include bigrams and trigrams
-            min_df=1,
-            max_df=0.8
-        )
-        
         try:
+            vectorizer = TfidfVectorizer(
+                max_features=30,
+                ngram_range=(1, 3),  # Include bigrams and trigrams
+                min_df=1,
+                max_df=0.8
+            )
+            
             tfidf_matrix = vectorizer.fit_transform(processed_titles)
             feature_names = vectorizer.get_feature_names_out()
             
@@ -200,8 +225,9 @@ class EnhancedContentAnalyzer:
             ]
             
             return topics
-        except:
-            return []
+        except Exception as e:
+            print(f"⚠️  TF-IDF extraction error: {e}, falling back to NLTK")
+            return self._extract_nltk_topics(titles)
     
     def _extract_named_entities(self, text: str) -> List[Dict]:
         """
@@ -322,6 +348,9 @@ class EnhancedContentAnalyzer:
                 'key_points': [...]
             }
         """
+        if not YOUTUBE_TRANSCRIPT_AVAILABLE:
+            return None
+        
         try:
             # Get transcript
             transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
