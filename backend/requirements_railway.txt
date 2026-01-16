@@ -1,0 +1,46 @@
+# TrendForge Backend - 轻量级依赖（Railway 优化版）
+# 总内存占用 < 400MB
+
+# ========== 核心框架 ==========
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+gunicorn==21.2.0
+pydantic==2.5.0
+python-dotenv==1.0.0
+
+# ========== 数据处理 ==========
+numpy==1.24.3
+pandas==2.0.3
+
+# ========== NLP（轻量级）==========
+# 只使用 NLTK，不使用 spaCy/KeyBERT/sklearn
+nltk==3.8.1
+
+# ========== YouTube API ==========
+google-api-python-client==2.108.0
+google-auth==2.23.4
+google-auth-httplib2==0.1.1
+google-auth-oauthlib==1.1.0
+
+# ========== 社交媒体 API ==========
+tweepy==4.14.0
+praw==7.7.1
+pytrends==4.9.2
+
+# ========== HTTP 请求 ==========
+httpx==0.25.1
+requests==2.31.0
+
+# ========== 文件处理 ==========
+python-multipart==0.0.6
+
+# ========== 工具库 ==========
+python-dateutil==2.8.2
+
+# ========== 注意 ==========
+# 以下库已移除以节省内存：
+# - spacy (200MB)
+# - keybert (150MB) 
+# - scikit-learn (100MB)
+# - sentence-transformers (300MB)
+# - youtube-transcript-api（字幕分析暂时禁用）

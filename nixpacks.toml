@@ -1,5 +1,6 @@
 # Nixpacks configuration for Railway
 # This file forces Railway to use NIXPACKS builder instead of Docker
+# Using lightweight requirements_railway.txt (no spaCy, KeyBERT, etc.)
 
 [phases.setup]
 nixPkgs = ["python39"]
@@ -7,8 +8,8 @@ nixPkgs = ["python39"]
 [phases.install]
 cmds = [
   "cd backend",
-  "pip install -r requirements_v2.txt",
-  "python -m spacy download en_core_web_sm"
+  "pip install -r requirements_railway.txt",
+  "python -c \"import nltk; nltk.download('punkt'); nltk.download('stopwords'); nltk.download('averaged_perceptron_tagger')\""
 ]
 
 [start]
