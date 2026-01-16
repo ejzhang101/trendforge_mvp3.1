@@ -143,7 +143,7 @@ export async function GET(
                 );
 
                 await Promise.all(
-                  channel.trends.map(async (ct: { trend: { keyword: string | null } | null }) => {
+                  channel.trends.map(async (ct: { trend: { keyword: string | null } | null; recommendationData: any; id: string }) => {
                     const kw = ct.trend?.keyword;
                     const pred = kw ? predictionMap.get(kw) : null;
                     if (!kw || !pred) return;
