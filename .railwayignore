@@ -4,7 +4,13 @@
 # Ignore Dockerfile in root (if exists)
 Dockerfile
 dockerfile
+**/Dockerfile
+**/dockerfile
 
 # Ignore docker-compose files
 docker-compose.yml
 docker-compose.yaml
+
+# Ignore backend Dockerfile (temporarily disabled)
+backend/Dockerfile
+backend/dockerfile
