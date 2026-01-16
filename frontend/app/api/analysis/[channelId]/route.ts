@@ -408,7 +408,7 @@ export async function GET(
         description: channel.description,
       },
       analysis: {
-        topics: v2Analysis.topics?.slice(0, 15) || channel.nicheKeywords.slice(0, 15).map((k) => ({ topic: k, score: 0.5 })),
+        topics: v2Analysis.topics?.slice(0, 15) || channel.nicheKeywords.slice(0, 15).map((k: string) => ({ topic: k, score: 0.5 })),
         contentStyle: v2Analysis.content_style || { primary_style: 'general' },
         targetAudience: (() => {
           // Use v2_analysis data if available, otherwise use defaults
