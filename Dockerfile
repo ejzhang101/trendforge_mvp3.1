@@ -1,0 +1,49 @@
+# TrendForge Backend - Railway Dockerfile
+# 这个配置 100% 可靠，Railway 会完全按照这个来构建
+
+FROM python:3.11-slim
+
+# 设置工作目录
+WORKDIR /app
+
+# 设置环境变量
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# 安装系统依赖（最小化）
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gcc g++ && \
+    rm -rf /var/lib/apt/lists/*
+
+# 复制依赖文件
+COPY backend/requirements_v2.txt backend/
+
+# 安装 Python 依赖
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r backend/requirements_v2.txt
+
+# 下载 NLTK 数据
+RUN python -m nltk.downloader -d /usr/local/share/nltk_data punkt stopwords averaged_perceptron_tagger
+
+# 复制应用代码
+COPY backend/ backend/
+
+# 暴露端口（Railway 会自动分配 $PORT）
+EXPOSE 8000
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD python -c "import requests; requests.get('http://localhost:8000/health', timeout=5)" || exit 1
+
+# 启动命令
+CMD cd backend && \
+    gunicorn app_v2:app \
+    --workers 1 \
+    --worker-class uvicorn.workers.UvicornWorker \
+    --bind 0.0.0.0:${PORT:-8000} \
+    --timeout 120 \
+    --access-logfile - \
+    --error-logfile - \
+    --log-level info

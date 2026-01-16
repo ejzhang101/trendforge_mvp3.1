@@ -1,16 +1,9 @@
 # Railway ignore file
-# Prevent Railway from detecting Dockerfile and using Docker builder
-
-# Ignore Dockerfile in root (if exists)
-Dockerfile
-dockerfile
-**/Dockerfile
-**/dockerfile
+# Note: Dockerfile in root is now used for Railway deployment
 
 # Ignore docker-compose files
 docker-compose.yml
 docker-compose.yaml
 
-# Ignore backend Dockerfile (temporarily disabled)
-backend/Dockerfile
-backend/dockerfile
+# Ignore backup Dockerfile
+backend/Dockerfile.backup
