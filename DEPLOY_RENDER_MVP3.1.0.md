@@ -110,9 +110,16 @@ cd backend && python -m uvicorn app_v2:app --host 0.0.0.0 --port $PORT
 
 **Environment**:
 - 选择 `Python 3`
+- **Python Version**: 3.9 或更高版本（推荐 3.9）
 
 **Root Directory**:
 - 留空（Render 会从仓库根目录开始）
+
+**⚠️ 重要提示**：
+- `$PORT` 是 Render 自动设置的环境变量，不要硬编码端口号
+- 确保 `requirements_v2.txt` 包含所有依赖（包括 `openai>=1.3.0`）
+- spaCy 模型下载可能需要几分钟，请耐心等待
+- 如果构建失败，检查 Render 日志中的错误信息
 
 #### 3. 配置环境变量
 
