@@ -76,7 +76,7 @@ export async function GET(
         const keywords = Array.from(
           new Set(
             channel.trends
-              .map((ct) => ct.trend?.keyword)
+              .map((ct: { trend: { keyword: string | null } | null }) => ct.trend?.keyword)
               .filter(Boolean)
           )
         ).slice(0, 3) as string[]; // keep it fast for interactive load
