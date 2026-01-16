@@ -60,14 +60,16 @@
 
 2. **获取 Redis 连接信息**
    - Railway 会自动创建 Redis 实例
-   - 在 Redis 服务的 "Variables" 标签页，找到 `REDIS_URL`
-   - 复制完整的连接字符串，格式如下：
+   - 在 Redis 服务的 "Variables" 标签页，找到 `REDIS_URL` 或 `REDISCLOUD_URL`
+   - **重要**：如果看到 `redis.railway.internal`，这是内部域名，在 Render 上无法访问
+   - **解决方案**：查找公共域名版本的 URL（格式：`redis://default:password@containers-us-west-xxx.railway.app:port`）
+   - 示例（内部域名，不可用）：
      ```
-     redis://default:password@hostname.railway.app:port
+     redis://default:password@redis.railway.internal:6379
      ```
-   - 或者使用格式：
+   - 示例（公共域名，可用）：
      ```
-     redis://:password@hostname.railway.app:port
+     redis://default:password@containers-us-west-xxx.railway.app:port
      ```
 
 3. **验证 Redis 连接**
