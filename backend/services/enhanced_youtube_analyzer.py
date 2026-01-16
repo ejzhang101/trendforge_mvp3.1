@@ -108,10 +108,10 @@ class EnhancedContentAnalyzer:
         # Combine all titles
         combined_text = ' '.join(titles)
         
-        # Method 1: TF-IDF + Noun Extraction
+        # Method 1: TF-IDF + Noun Extraction (or NLTK-only fallback)
         tfidf_topics = self._extract_tfidf_topics(titles)
         
-        # Method 2: spaCy Named Entity Recognition
+        # Method 2: Named Entity Recognition (spaCy or NLTK fallback)
         ner_topics = self._extract_named_entities(combined_text)
         
         # Method 3: KeyBERT semantic keywords (if available)
@@ -206,24 +206,32 @@ class EnhancedContentAnalyzer:
     def _extract_named_entities(self, text: str) -> List[Dict]:
         """
         Extract named entities (brands, products, technologies, etc.)
+        Uses spaCy if available, falls back to NLTK proper noun extraction
         """
-        doc = nlp(text)
-        entities = []
+        if not SPACY_AVAILABLE or not nlp:
+            return self._extract_proper_nouns_nltk(text)
         
-        entity_counter = Counter()
-        for ent in doc.ents:
-            if ent.label_ in ['ORG', 'PRODUCT', 'GPE', 'PERSON', 'WORK_OF_ART', 'EVENT']:
-                entity_counter[ent.text.lower()] += 1
-        
-        for entity, count in entity_counter.most_common(10):
-            entities.append({
-                'topic': entity,
-                'score': count / len(doc.ents) if doc.ents else 0,
-                'type': 'entity',
-                'frequency': count
-            })
-        
-        return entities
+        try:
+            doc = nlp(text)
+            entities = []
+            
+            entity_counter = Counter()
+            for ent in doc.ents:
+                if ent.label_ in ['ORG', 'PRODUCT', 'GPE', 'PERSON', 'WORK_OF_ART', 'EVENT']:
+                    entity_counter[ent.text.lower()] += 1
+            
+            for entity, count in entity_counter.most_common(10):
+                entities.append({
+                    'topic': entity,
+                    'score': count / len(doc.ents) if doc.ents else 0,
+                    'type': 'entity',
+                    'frequency': count
+                })
+            
+            return entities
+        except Exception as e:
+            print(f"⚠️  spaCy NER error: {e}, falling back to NLTK")
+            return self._extract_proper_nouns_nltk(text)
     
     def _extract_semantic_keywords(self, text: str) -> List[Dict]:
         """
