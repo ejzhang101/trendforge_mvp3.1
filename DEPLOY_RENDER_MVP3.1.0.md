@@ -121,12 +121,13 @@ cd backend && python -m uvicorn app_v2:app --host 0.0.0.0 --port $PORT
 ```bash
 # 必需变量
 PORT=10000
-DATABASE_URL=postgresql://postgres:password@hostname.railway.app:port/railway
-REDIS_URL=redis://:password@hostname.railway.app:port
+DATABASE_URL=postgresql://postgres:JUsqimUhdhHSOJhJyWpdPMbhyAokKNaq@caboose.proxy.rlwy.net:31013/railway
+REDIS_URL=redis://default:eGYxYOZczvIoDKPjMVwlArItcyekdkwj@ballast.proxy.rlwy.net:15033
 
 # API Keys
 TWITTER_BEARER_TOKEN=你的Twitter_Bearer_Token
 SERPAPI_KEY=ae0f9c0cb85d9ad79a93f65b7d6296e18d751babc56f03b41ddd163e5ff02599
+YOUTUBE_API_KEY=AIzaSyBoIIM1_PHpMFnCyk5KtvnYGKfVnzJQ2lc
 
 # MVP 3.1.0 新增：LLM 脚本生成（可选但推荐）
 OPENAI_API_KEY=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
@@ -276,12 +277,12 @@ redis://:password@hostname.railway.app:port
 
 ```bash
 # 使用 redis-cli
-redis-cli -u redis://:password@hostname.railway.app:port ping
+redis-cli -u redis://default:eGYxYOZczvIoDKPjMVwlArItcyekdkwj@ballast.proxy.rlwy.net:15033 ping
 
 # 或使用 Python
 python -c "
 import redis
-r = redis.from_url('redis://:password@hostname.railway.app:port')
+r = redis.from_url('redis://default:eGYxYOZczvIoDKPjMVwlArItcyekdkwj@ballast.proxy.rlwy.net:15033')
 print(r.ping())  # 应该输出: True
 "
 ```
