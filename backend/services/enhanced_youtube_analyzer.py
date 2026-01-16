@@ -13,40 +13,70 @@ import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk import pos_tag
-import spacy
 
-# Machine Learning
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.cluster import KMeans
+# Try to import spaCy (optional for lightweight deployment)
+try:
+    import spacy
+    SPACY_AVAILABLE = True
+except ImportError:
+    SPACY_AVAILABLE = False
+    spacy = None
+    nlp = None
+    print("⚠️  spaCy not available. Using NLTK-only mode. Install: pip install spacy")
 
-# YouTube Transcript
-from youtube_transcript_api import YouTubeTranscriptApi
+# Machine Learning (optional for lightweight deployment)
+try:
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.cluster import KMeans
+    SKLEARN_AVAILABLE = True
+except ImportError:
+    SKLEARN_AVAILABLE = False
+    TfidfVectorizer = None
+    KMeans = None
+    print("⚠️  scikit-learn not available. Using NLTK-only mode. Install: pip install scikit-learn")
 
-# Semantic Keywords
+# YouTube Transcript (optional)
+try:
+    from youtube_transcript_api import YouTubeTranscriptApi
+    YOUTUBE_TRANSCRIPT_AVAILABLE = True
+except ImportError:
+    YOUTUBE_TRANSCRIPT_AVAILABLE = False
+    YouTubeTranscriptApi = None
+    print("⚠️  youtube-transcript-api not available. Transcript analysis disabled.")
+
+# Semantic Keywords (optional)
 try:
     from keybert import KeyBERT
     KEYBERT_AVAILABLE = True
 except ImportError:
     KEYBERT_AVAILABLE = False
+    KeyBERT = None
     print("⚠️  KeyBERT not available. Install: pip install keybert")
 
 # Download required NLTK data
 try:
     nltk.data.find('tokenizers/punkt')
 except LookupError:
-    nltk.download('punkt')
-    nltk.download('stopwords')
-    nltk.download('averaged_perceptron_tagger')
-    nltk.download('wordnet')
+    nltk.download('punkt', quiet=True)
+    nltk.download('stopwords', quiet=True)
+    nltk.download('averaged_perceptron_tagger', quiet=True)
+    nltk.download('wordnet', quiet=True)
 
-# Load spaCy model
-try:
-    nlp = spacy.load('en_core_web_sm')
-except OSError:
-    print("⚠️  Downloading spaCy model...")
-    import subprocess
-    subprocess.run(['python', '-m', 'spacy', 'download', 'en_core_web_sm'])
-    nlp = spacy.load('en_core_web_sm')
+# Load spaCy model (if available)
+if SPACY_AVAILABLE:
+    try:
+        nlp = spacy.load('en_core_web_sm')
+    except OSError:
+        try:
+            print("⚠️  Downloading spaCy model...")
+            import subprocess
+            subprocess.run(['python', '-m', 'spacy', 'download', 'en_core_web_sm'], check=False)
+            nlp = spacy.load('en_core_web_sm')
+        except:
+            nlp = None
+            print("⚠️  Failed to load spaCy model. Using NLTK-only mode.")
+else:
+    nlp = None
 
 
 class EnhancedContentAnalyzer:
@@ -94,6 +124,35 @@ class EnhancedContentAnalyzer:
         all_topics = self._merge_topics(tfidf_topics, ner_topics, semantic_topics)
         
         return all_topics[:15]  # Top 15 topics
+    
+    def _extract_nltk_topics(self, titles: List[str]) -> List[Dict]:
+        """
+        Extract topics using NLTK only (lightweight mode)
+        """
+        # Combine all titles
+        combined_text = ' '.join(titles).lower()
+        
+        # Tokenize and filter
+        tokens = word_tokenize(combined_text)
+        tokens = [t for t in tokens if t.isalnum() and t not in self.stop_words and len(t) > 2]
+        
+        # POS tagging
+        pos_tags = pos_tag(tokens)
+        nouns = [word for word, pos in pos_tags if pos.startswith('NN')]
+        
+        # Count frequency
+        topic_counter = Counter(nouns)
+        
+        topics = []
+        for topic, count in topic_counter.most_common(15):
+            topics.append({
+                'topic': topic,
+                'score': count / len(nouns) if nouns else 0,
+                'type': 'nltk',
+                'frequency': count
+            })
+        
+        return topics
     
     def _extract_tfidf_topics(self, titles: List[str]) -> List[Dict]:
         """
