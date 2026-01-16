@@ -33,9 +33,9 @@ COPY backend/ backend/
 # 暴露端口（Railway 会自动分配 $PORT）
 EXPOSE 8000
 
-# 健康检查
+# 健康检查（使用 curl 或跳过，因为 requests 可能未安装）
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/health', timeout=5)" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)" || exit 1
 
 # 启动命令
 CMD cd backend && \
