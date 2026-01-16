@@ -139,6 +139,32 @@
 }
 ```
 
+**⚠️ 重要：确保 Railway 使用 NIXPACKS 而不是 Docker**
+
+如果遇到 `pip: command not found` 错误，说明 Railway 误检测为 Docker 项目。解决方法：
+
+1. **在 Railway Dashboard 中**：
+   - 选择后端服务
+   - 进入 "Settings" 标签页
+   - 找到 "Build & Deploy" 部分
+   - 确保 "Builder" 设置为 **"NIXPACKS"**（不是 Docker）
+   - 如果显示 "Docker"，点击切换为 "NIXPACKS"
+
+2. **删除 Dockerfile（如果存在）**：
+   - Railway 如果检测到根目录有 Dockerfile，可能会自动使用 Docker
+   - 如果不需要 Docker，可以暂时重命名或删除根目录的 Dockerfile
+   - 注意：`backend/Dockerfile` 不影响，只有根目录的 `Dockerfile` 会影响
+
+3. **手动指定构建器**：
+   - 在 Railway Dashboard → Settings → Build & Deploy
+   - 找到 "Builder" 选项
+   - 明确选择 "NIXPACKS"
+   - 保存设置
+
+4. **重新部署**：
+   - 保存设置后，触发新的部署
+   - Railway 应该使用 NIXPACKS 构建，而不是 Docker
+
 ### 3. 配置环境变量
 
 在 Railway Dashboard → 后端服务 → Variables 中添加：
