@@ -206,9 +206,9 @@ curl https://your-app.onrender.com/health
 
 ```bash
 # 必需变量
-DATABASE_URL=postgresql://postgres:password@hostname.railway.app:port/railway
+DATABASE_URL=postgresql://postgres:JUsqimUhdhHSOJhJyWpdPMbhyAokKNaq@caboose.proxy.rlwy.net:31013/railway
 BACKEND_SERVICE_URL=https://your-app.onrender.com
-YOUTUBE_API_KEY=你的YouTube_API_Key
+YOUTUBE_API_KEY=AIzaSyBoIIM1_PHpMFnCyk5KtvnYGKfVnzJQ2lc
 NEXT_PUBLIC_APP_URL=https://your-app.vercel.app
 
 # 可选变量
