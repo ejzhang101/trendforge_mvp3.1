@@ -1,0 +1,10 @@
+# Railway ignore file
+# Prevent Railway from detecting Dockerfile and using Docker builder
+
+# Ignore Dockerfile in root (if exists)
+Dockerfile
+dockerfile
+
+# Ignore docker-compose files
+docker-compose.yml
+docker-compose.yaml

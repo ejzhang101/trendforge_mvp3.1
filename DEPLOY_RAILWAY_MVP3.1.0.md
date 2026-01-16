@@ -117,9 +117,11 @@
      - **Build Command**: `cd backend && pip install -r requirements_v2.txt && python -m spacy download en_core_web_sm`
      - **Start Command**: `cd backend && python -m uvicorn app_v2:app --host 0.0.0.0 --port $PORT`
 
-### 2. 验证 railway.json 配置
+### 2. 验证配置文件
 
-确保项目根目录有 `railway.json` 文件：
+确保项目根目录有以下配置文件：
+
+#### railway.json
 
 ```json
 {
@@ -139,31 +141,77 @@
 }
 ```
 
+#### nixpacks.toml（强制使用 NIXPACKS）
+
+创建 `nixpacks.toml` 文件在项目根目录，强制 Railway 使用 NIXPACKS：
+
+```toml
+# Nixpacks configuration for Railway
+# This file forces Railway to use NIXPACKS builder instead of Docker
+
+[phases.setup]
+nixPkgs = ["python39", "pip"]
+
+[phases.install]
+cmds = [
+  "cd backend",
+  "pip install -r requirements_v2.txt",
+  "python -m spacy download en_core_web_sm"
+]
+
+[start]
+cmd = "cd backend && python -m uvicorn app_v2:app --host 0.0.0.0 --port $PORT"
+```
+
+#### .railwayignore（防止 Docker 检测）
+
+创建 `.railwayignore` 文件，防止 Railway 检测 Dockerfile：
+
+```
+# Railway ignore file
+# Prevent Railway from detecting Dockerfile and using Docker builder
+
+# Ignore Dockerfile in root (if exists)
+Dockerfile
+dockerfile
+
+# Ignore docker-compose files
+docker-compose.yml
+docker-compose.yaml
+```
+
 **⚠️ 重要：确保 Railway 使用 NIXPACKS 而不是 Docker**
 
 如果遇到 `pip: command not found` 错误，说明 Railway 误检测为 Docker 项目。解决方法：
 
-1. **在 Railway Dashboard 中**：
+1. **创建配置文件**（已创建）：
+   - ✅ `nixpacks.toml` - 强制使用 NIXPACKS
+   - ✅ `.railwayignore` - 防止检测 Dockerfile
+   - ✅ `railway.json` - Railway 配置
+
+2. **在 Railway Dashboard 中**：
    - 选择后端服务
    - 进入 "Settings" 标签页
    - 找到 "Build & Deploy" 部分
    - 确保 "Builder" 设置为 **"NIXPACKS"**（不是 Docker）
    - 如果显示 "Docker"，点击切换为 "NIXPACKS"
 
-2. **删除 Dockerfile（如果存在）**：
+3. **删除或重命名根目录 Dockerfile**（如果存在）：
    - Railway 如果检测到根目录有 Dockerfile，可能会自动使用 Docker
    - 如果不需要 Docker，可以暂时重命名或删除根目录的 Dockerfile
    - 注意：`backend/Dockerfile` 不影响，只有根目录的 `Dockerfile` 会影响
 
-3. **手动指定构建器**：
-   - 在 Railway Dashboard → Settings → Build & Deploy
-   - 找到 "Builder" 选项
-   - 明确选择 "NIXPACKS"
-   - 保存设置
+4. **提交配置文件到 Git**：
+   ```bash
+   git add nixpacks.toml .railwayignore railway.json
+   git commit -m "Force Railway to use NIXPACKS builder"
+   git push origin main
+   ```
 
-4. **重新部署**：
+5. **重新部署**：
    - 保存设置后，触发新的部署
    - Railway 应该使用 NIXPACKS 构建，而不是 Docker
+   - 查看构建日志，确认使用 NIXPACKS
 
 ### 3. 配置环境变量
 

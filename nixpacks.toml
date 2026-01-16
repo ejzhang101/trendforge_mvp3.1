@@ -1,0 +1,15 @@
+# Nixpacks configuration for Railway
+# This file forces Railway to use NIXPACKS builder instead of Docker
+
+[phases.setup]
+nixPkgs = ["python39", "pip"]
+
+[phases.install]
+cmds = [
+  "cd backend",
+  "pip install -r requirements_v2.txt",
+  "python -m spacy download en_core_web_sm"
+]
+
+[start]
+cmd = "cd backend && python -m uvicorn app_v2:app --host 0.0.0.0 --port $PORT"
