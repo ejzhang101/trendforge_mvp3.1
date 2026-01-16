@@ -1,9 +1,10 @@
 {
-  "buildCommand": "cd frontend && pnpm install && pnpm build",
-  "outputDirectory": "frontend/.next",
+  "buildCommand": "pnpm install && pnpm build",
+  "outputDirectory": ".next",
   "framework": "nextjs",
-  "installCommand": "cd frontend && pnpm install",
-  "devCommand": "cd frontend && pnpm dev",
+  "installCommand": "pnpm install",
+  "devCommand": "pnpm dev",
+  "rootDirectory": "frontend",
   "rewrites": [
     {
       "source": "/api/:path*",
