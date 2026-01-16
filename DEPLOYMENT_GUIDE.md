@@ -16,7 +16,7 @@
 - [x] `backend/Dockerfile` - 后端容器配置
 - [x] `frontend/Dockerfile` - 前端容器配置
 
-## 🎯 推荐部署方案：Vercel (前端) + Railway (后端)
+## 🎯 推荐部署方案：Vercel (前端) + Render (后端) + Railway (PostgreSQL + Redis)
 
 ### 第一步：后端部署到 Railway
 
