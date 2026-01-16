@@ -114,7 +114,8 @@
    - Railway 会自动读取 `railway.json` 配置文件
    - 如果未自动检测，手动设置：
      - **Root Directory**: 留空（Railway 从仓库根目录开始）
-     - **Build Command**: `cd backend && pip install -r requirements_v2.txt && python -m spacy download en_core_web_sm`
+     - **Build Command** (轻量级): `cd backend && pip install -r requirements_railway.txt && python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords'); nltk.download('averaged_perceptron_tagger')"`
+     - **Build Command** (完整版): `cd backend && pip install -r requirements_v2.txt && python -m spacy download en_core_web_sm`
      - **Start Command**: `cd backend && python -m uvicorn app_v2:app --host 0.0.0.0 --port $PORT`
 
 ### 2. 验证配置文件
