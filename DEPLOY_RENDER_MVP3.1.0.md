@@ -350,6 +350,56 @@ curl https://your-app.onrender.com/health
 
 ## 🐛 常见问题
 
+### 0. Dockerfile 错误
+
+**错误信息**：`error: failed to solve: failed to read dockerfile: open Dockerfile: no such file or directory`
+
+**原因**：
+- Render 可能误检测为 Docker 项目
+- Root Directory 配置错误
+- 构建方式选择错误
+
+**解决方案**：
+
+1. **检查 Root Directory 设置**：
+   - 在 Render Dashboard → Settings → Build & Deploy
+   - 找到 "Root Directory" 字段
+   - 确保该字段为**空**（不要填写任何路径，包括 `backend` 或 `.`）
+   - 如果填写了路径，清空它
+
+2. **确认构建方式**：
+   - 在 Settings → Build & Deploy
+   - 检查 "Docker" 选项是否被选中
+   - 如果选中了 Docker，**取消选中**
+   - Render 应该自动检测为 "Nixpacks" 或 "Python"
+
+3. **手动设置构建命令**（如果自动检测失败）：
+   - 在 Settings → Build & Deploy
+   - 找到 "Build Command" 字段，设置为：
+     ```
+     cd backend && pip install -r requirements_v2.txt && python -m spacy download en_core_web_sm
+     ```
+   - 找到 "Start Command" 字段，设置为：
+     ```
+     cd backend && python -m uvicorn app_v2:app --host 0.0.0.0 --port $PORT
+     ```
+
+4. **重新部署**：
+   - 保存设置后，点击 "Manual Deploy" 或等待自动部署
+   - 查看构建日志，确认不再尝试使用 Docker
+
+5. **如果问题仍然存在**：
+   - 删除当前服务
+   - 重新创建 Web Service
+   - 在创建时明确选择 "Python" 环境
+   - 不要选择 "Docker" 选项
+
+**重要提示**：
+- ✅ Render 使用 **Nixpacks** 自动构建 Python 项目
+- ✅ **不需要 Dockerfile**
+- ✅ 只需要 Build Command 和 Start Command
+- ❌ 不要选择 Docker 构建方式
+
 ### 1. Redis 连接失败
 
 **问题**：健康检查显示 `cache: false`
