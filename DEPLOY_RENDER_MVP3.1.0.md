@@ -115,6 +115,11 @@ cd backend && python -m uvicorn app_v2:app --host 0.0.0.0 --port $PORT
 **Root Directory**:
 - 留空（Render 会从仓库根目录开始）
 
+**⚠️ 重要：Render 不需要 Dockerfile**
+- Render 会自动检测 Python 项目并使用 Nixpacks 构建
+- 不需要创建或配置 Dockerfile
+- 如果看到 Dockerfile 相关错误，检查 Root Directory 设置是否正确
+
 **⚠️ 重要提示**：
 - `$PORT` 是 Render 自动设置的环境变量，不要硬编码端口号
 - 确保 `requirements_v2.txt` 包含所有依赖（包括 `openai>=1.3.0`）
