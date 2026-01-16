@@ -62,14 +62,14 @@
    - Railway 会自动创建 Redis 实例
    - 在 Redis 服务的 "Variables" 标签页，找到 `REDIS_URL` 或 `REDISCLOUD_URL`
    - **重要**：如果看到 `redis.railway.internal`，这是内部域名，在 Render 上无法访问
-   - **解决方案**：查找公共域名版本的 URL（格式：`redis://default:password@containers-us-west-xxx.railway.app:port`）
+   - **解决方案**：查找公共域名版本的 URL（格式：`redis://default:password@ballast.proxy.rlwy.net:port`）
    - 示例（内部域名，不可用）：
      ```
      redis://default:password@redis.railway.internal:6379
      ```
    - 示例（公共域名，可用）：
      ```
-     redis://default:password@containers-us-west-xxx.railway.app:port
+     redis://default:eGYxYOZczvIoDKPjMVwlArItcyekdkwj@ballast.proxy.rlwy.net:15033
      ```
 
 3. **验证 Redis 连接**
