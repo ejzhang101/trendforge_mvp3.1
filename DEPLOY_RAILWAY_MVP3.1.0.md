@@ -150,7 +150,7 @@
 # This file forces Railway to use NIXPACKS builder instead of Docker
 
 [phases.setup]
-nixPkgs = ["python39", "pip"]
+nixPkgs = ["python39"]
 
 [phases.install]
 cmds = [
@@ -162,6 +162,8 @@ cmds = [
 [start]
 cmd = "cd backend && python -m uvicorn app_v2:app --host 0.0.0.0 --port $PORT"
 ```
+
+**注意**：`pip` 不需要单独指定，它会随 `python39` 一起自动安装。
 
 #### .railwayignore（防止 Docker 检测）
 

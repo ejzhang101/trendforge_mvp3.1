@@ -58,7 +58,7 @@ Railway 仍然使用 Docker 构建，导致 `pip: command not found` 错误。
 ```toml
 # Nixpacks configuration for Railway
 [phases.setup]
-nixPkgs = ["python39", "pip"]
+nixPkgs = ["python39"]
 
 [phases.install]
 cmds = [
@@ -70,6 +70,8 @@ cmds = [
 [start]
 cmd = "cd backend && python -m uvicorn app_v2:app --host 0.0.0.0 --port $PORT"
 ```
+
+**注意**：`pip` 不需要单独指定，它会随 `python39` 一起安装。
 
 #### .railwayignore
 ```
