@@ -20,9 +20,10 @@ RUN apt-get update && \
 # 复制依赖文件
 COPY backend/requirements_v2.txt backend/
 
-# 安装 Python 依赖
+# 安装 Python 依赖（包括 ML 增强功能）
 RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r backend/requirements_v2.txt
+    pip install --no-cache-dir -r backend/requirements_v2.txt && \
+    echo "✅ All dependencies installed (including ML enhancements)"
 
 # 下载所有 NLTK 数据（一次性全部下载，避免运行时缺失）
 RUN python -c "import nltk; \
