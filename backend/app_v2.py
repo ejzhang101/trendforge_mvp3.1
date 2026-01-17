@@ -40,7 +40,11 @@ from services.enhanced_youtube_analyzer import (
 )
 
 # Verify we're using the correct analyzer
+print(f"✅ Using content_analyzer: {type(content_analyzer).__name__}")
 print(f"✅ Using audience_analyzer: {type(audience_analyzer).__name__}")
+print(f"✅ Analyzer has extract_topics_from_titles: {hasattr(content_analyzer, 'extract_topics_from_titles')}")
+print(f"✅ Analyzer has _extract_proper_nouns: {hasattr(content_analyzer, '_extract_proper_nouns')}")
+print(f"✅ Analyzer has _extract_proper_nouns_nltk: {hasattr(content_analyzer, '_extract_proper_nouns_nltk')} (should be False)")
 # Try to use enhanced social collector (MVP 3.0), fallback to original
 try:
     from services.enhanced_social_collector import EnhancedSocialMediaAggregator
