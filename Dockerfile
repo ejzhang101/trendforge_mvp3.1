@@ -24,8 +24,8 @@ COPY backend/requirements_v2.txt backend/
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r backend/requirements_v2.txt
 
-# 下载 NLTK 数据
-RUN python -m nltk.downloader -d /usr/local/share/nltk_data punkt stopwords averaged_perceptron_tagger
+# 下载 NLTK 数据（包括 punkt_tab for NLTK 3.8.1+）
+RUN python -m nltk.downloader -d /usr/local/share/nltk_data punkt punkt_tab stopwords averaged_perceptron_tagger wordnet
 
 # 复制应用代码
 COPY backend/ backend/

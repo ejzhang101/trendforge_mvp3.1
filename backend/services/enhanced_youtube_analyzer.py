@@ -54,13 +54,19 @@ except ImportError:
     print("⚠️  KeyBERT not available. Install: pip install keybert")
 
 # Download required NLTK data
+# NLTK 3.8.1+ uses punkt_tab instead of punkt
 try:
-    nltk.data.find('tokenizers/punkt')
+    nltk.data.find('tokenizers/punkt_tab')
 except LookupError:
-    nltk.download('punkt', quiet=True)
-    nltk.download('stopwords', quiet=True)
-    nltk.download('averaged_perceptron_tagger', quiet=True)
-    nltk.download('wordnet', quiet=True)
+    try:
+        nltk.data.find('tokenizers/punkt')
+    except LookupError:
+        # Download both for compatibility
+        nltk.download('punkt', quiet=True)
+        nltk.download('punkt_tab', quiet=True)
+        nltk.download('stopwords', quiet=True)
+        nltk.download('averaged_perceptron_tagger', quiet=True)
+        nltk.download('wordnet', quiet=True)
 
 # Load spaCy model (if available)
 if SPACY_AVAILABLE:

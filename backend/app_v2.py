@@ -24,6 +24,22 @@ for mod in modules_to_clear:
     if mod in sys.modules:
         del sys.modules[mod]
 
+# Ensure NLTK data is downloaded before importing analyzers
+import nltk
+try:
+    nltk.data.find('tokenizers/punkt_tab')
+except LookupError:
+    try:
+        nltk.data.find('tokenizers/punkt')
+    except LookupError:
+        print("📦 Downloading NLTK data...")
+        nltk.download('punkt', quiet=True)
+        nltk.download('punkt_tab', quiet=True)
+        nltk.download('stopwords', quiet=True)
+        nltk.download('averaged_perceptron_tagger', quiet=True)
+        nltk.download('wordnet', quiet=True)
+        print("✅ NLTK data downloaded")
+
 from services.enhanced_youtube_analyzer import (
     analyze_channel_deeply,
     content_analyzer,
