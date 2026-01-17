@@ -564,17 +564,20 @@ async def full_analysis(request: FullAnalysisRequest):
                         topic_score = topic_data.get('score', 0.5)
                         
                         # 改进的模拟数据生成逻辑：
-                        # 1. composite_score: 基于主题分数，但考虑频道表现
-                        #    高表现频道 + 高主题分数 = 更高的热度
+                        # 1. composite_score: 基于主题分数，但考虑频道表现和排名
+                        #    高表现频道 + 高主题分数 + 排名 = 更高的热度
                         channel_performance_factor = min(1.2, avg_views / 50000)  # 频道表现系数
+                        rank_factor = (len(channel_topics) - idx) / len(channel_topics)  # 排名因子（0-1）
                         base_composite = topic_score * 100
-                        # 对于高表现频道，给予更高的基础热度
-                        composite_score = min(100, base_composite * (0.8 + channel_performance_factor * 0.2))
+                        # 对于高表现频道和排名靠前的主题，给予更高的基础热度
+                        # 添加排名因子确保不同话题有不同的 composite_score
+                        composite_score = min(100, base_composite * (0.7 + channel_performance_factor * 0.2 + rank_factor * 0.1) + idx * 2)
                         
                         # 2. growth_rate: 基于主题分数和排名
                         #    排名越靠前，增长率越高（模拟新兴趋势）
                         rank_factor = (len(channel_topics) - idx) / len(channel_topics)  # 排名因子
-                        growth_rate = topic_score * 30 + rank_factor * 20  # 30-50 范围
+                        # 为不同话题生成不同的增长率，确保差异化
+                        growth_rate = topic_score * 30 + rank_factor * 20 + (idx % 10) * 2  # 30-70 范围，添加多样性
                         
                         # 3. 添加更多上下文信息
                         # 生成模拟的 hashtags 和 subreddits（基于主题关键词）

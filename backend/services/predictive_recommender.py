@@ -389,7 +389,14 @@ class PredictiveRecommendationEngine:
         viral_score = base_score + growth_bonus + platform_bonus + data_quality_bonus
         
         # 确保分数在合理范围内
-        viral_score = max(20, min(100, round(viral_score, 2)))
+        # 如果 composite_score 为 0 或很小，基于其他因素生成差异化分数
+        if base_score < 10:
+            # 对于模拟数据，基于 growth_rate 和 source_count 生成差异化分数
+            # 确保不同话题有不同的热度值
+            diversity_factor = (growth_rate % 50) + (source_count * 5)  # 添加多样性因子
+            viral_score = max(25, min(85, 30 + diversity_factor + growth_bonus + platform_bonus))
+        else:
+            viral_score = max(20, min(100, round(viral_score, 2)))
         
         return viral_score
     

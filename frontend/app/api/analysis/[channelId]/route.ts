@@ -333,17 +333,31 @@ export async function GET(
           relatedInfo: (() => {
             // 优先使用存储的 relatedInfo
             if (recData?.relatedInfo) {
+              const stored = recData.relatedInfo;
               return {
-                rising_queries: recData.relatedInfo.rising_queries || [],
-                hashtags: recData.relatedInfo.hashtags || recData.relatedInfo.twitter_hashtags || [],
-                subreddits: recData.relatedInfo.subreddits || recData.relatedInfo.reddit_subreddits || [],
+                rising_queries: stored.rising_queries || [],
+                hashtags: stored.hashtags || stored.twitter_hashtags || [],
+                subreddits: stored.subreddits || stored.reddit_subreddits || [],
               };
             }
             // 如果没有存储的 relatedInfo，尝试从 trendData 中获取
+            // 检查多个可能的字段名
+            const hashtags = trendData.twitter_hashtags || 
+                            trendData.hashtags || 
+                            (trendData.relatedInfo?.hashtags) ||
+                            (trendData.relatedInfo?.twitter_hashtags) || [];
+            const subreddits = trendData.reddit_subreddits || 
+                                 trendData.subreddits || 
+                                 (trendData.relatedInfo?.subreddits) ||
+                                 (trendData.relatedInfo?.reddit_subreddits) || [];
+            const risingQueries = trendData.relatedKeywords || 
+                                  trendData.rising_queries || 
+                                  (trendData.relatedInfo?.rising_queries) || [];
+            
             return {
-              rising_queries: trendData.relatedKeywords || [],
-              hashtags: trendData.twitter_hashtags || [],
-              subreddits: trendData.reddit_subreddits || [],
+              rising_queries: Array.isArray(risingQueries) ? risingQueries : [],
+              hashtags: Array.isArray(hashtags) ? hashtags : [],
+              subreddits: Array.isArray(subreddits) ? subreddits : [],
             };
           })(),
           // MVP 3.0: Add prediction data if available
