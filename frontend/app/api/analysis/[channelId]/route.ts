@@ -208,7 +208,7 @@ export async function GET(
 
     // Format recommendations from database with full details
     // 如果没有推荐数据，尝试从频道主题生成基础推荐
-    let recommendations = channel.trends.map((ct: { trend: any; recommendationData: any; matchScore: number; id: string; reasoning: string | null }) => {
+    let recommendations = channel.trends.map((ct: { trend: any; recommendationData: any; matchScore: number; id: string; reasoning: string | null; contentAngle: string | null }) => {
       const trendData = ct.trend;
       const recData = ct.recommendationData as any;
       
