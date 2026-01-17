@@ -577,14 +577,45 @@ async def full_analysis(request: FullAnalysisRequest):
                         growth_rate = topic_score * 30 + rank_factor * 20  # 30-50 范围
                         
                         # 3. 添加更多上下文信息
+                        # 生成模拟的 hashtags 和 subreddits（基于主题关键词）
+                        # 提取关键词的主要单词，生成相关的 hashtags
+                        topic_words = topic.lower().split()
+                        mock_hashtags = []
+                        for word in topic_words[:3]:  # 最多3个单词
+                            if len(word) > 3:  # 只处理长度>3的单词
+                                # 生成相关 hashtag（移除空格，首字母大写）
+                                hashtag = word.replace(' ', '').title()
+                                mock_hashtags.append(hashtag)
+                        
+                        # 如果没有生成 hashtags，使用关键词本身
+                        if not mock_hashtags:
+                            mock_hashtags = [topic.replace(' ', '').title()[:20]]  # 限制长度
+                        
+                        # 生成模拟的 subreddits（基于主题类别）
+                        # 根据主题内容推断可能的 subreddits
+                        mock_subreddits = []
+                        topic_lower = topic.lower()
+                        # 常见 subreddits 映射
+                        if any(word in topic_lower for word in ['trading', 'stock', 'invest', 'finance']):
+                            mock_subreddits = ['stocks', 'investing', 'wallstreetbets']
+                        elif any(word in topic_lower for word in ['tech', 'software', 'programming', 'code']):
+                            mock_subreddits = ['technology', 'programming', 'software']
+                        elif any(word in topic_lower for word in ['game', 'gaming', 'play']):
+                            mock_subreddits = ['gaming', 'games', 'pcgaming']
+                        elif any(word in topic_lower for word in ['video', 'youtube', 'content']):
+                            mock_subreddits = ['videos', 'youtube', 'content']
+                        else:
+                            # 通用 subreddits
+                            mock_subreddits = ['videos', 'technology', 'gaming']
+                        
                         mock_trend = {
                             'keyword': topic,
                             'composite_score': round(composite_score, 2),
                             'growth_rate': round(growth_rate, 2),
                             'sources': ['channel_analysis'],
                             'rising_queries': [topic],  # 至少包含关键词本身
-                            'twitter_hashtags': [],
-                            'reddit_subreddits': [],
+                            'twitter_hashtags': mock_hashtags[:5],  # 最多5个 hashtags
+                            'reddit_subreddits': mock_subreddits[:3],  # 最多3个 subreddits
                             'trend_score': round(composite_score, 2),  # 兼容字段
                             'interest_over_time': [],  # 时间序列数据（空，因为没有真实数据）
                             'related_queries': []  # 相关查询（空）
