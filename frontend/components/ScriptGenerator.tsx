@@ -26,7 +26,13 @@ export default function ScriptGenerator({ channelAnalysis, recommendations }: Sc
 
     try {
       // 调用后端API（通过前端API路由代理）
-      const backendBaseUrl = process.env.NEXT_PUBLIC_BACKEND_SERVICE_URL || 'http://localhost:8000';
+      let backendBaseUrl = process.env.NEXT_PUBLIC_BACKEND_SERVICE_URL || 'http://localhost:8000';
+      
+      // Ensure URL has protocol (fix for Railway URLs without https://)
+      if (backendBaseUrl && !backendBaseUrl.startsWith('http://') && !backendBaseUrl.startsWith('https://')) {
+        backendBaseUrl = `https://${backendBaseUrl}`;
+      }
+      
       const response = await fetch(`${backendBaseUrl}/api/v3/generate-scripts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -52,7 +52,12 @@ export async function GET(
     // ==================== MVP 3.0: Auto-refresh predictions (confidence >= 75) ====================
     const PREDICTIONS_MIN_CONFIDENCE = 75;
     const PREDICTIONS_ALGO_VERSION = '2026-01-14-75plus';
-    const backendBaseUrl = process.env.BACKEND_SERVICE_URL || 'http://localhost:8000';
+    let backendBaseUrl = process.env.BACKEND_SERVICE_URL || 'http://localhost:8000';
+    
+    // Ensure URL has protocol (fix for Railway URLs without https://)
+    if (backendBaseUrl && !backendBaseUrl.startsWith('http://') && !backendBaseUrl.startsWith('https://')) {
+      backendBaseUrl = `https://${backendBaseUrl}`;
+    }
 
     let trendPredictions = Array.isArray(v2Analysis?.trend_predictions)
       ? v2Analysis.trend_predictions
