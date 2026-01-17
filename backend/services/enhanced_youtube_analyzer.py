@@ -253,6 +253,42 @@ class EnhancedContentAnalyzer:
             print(f"⚠️  TF-IDF extraction error: {e}, falling back to NLTK")
             return self._extract_nltk_topics(titles)
     
+    def _extract_proper_nouns_nltk(self, text: str) -> List[Dict]:
+        """
+        Extract proper nouns using NLTK (fallback when spaCy unavailable)
+        """
+        try:
+            # Tokenize and POS tag
+            tokens = word_tokenize(text)
+            pos_tags = pos_tag(tokens)
+            
+            # Extract proper nouns (NNP, NNPS)
+            proper_nouns = [
+                word.lower() 
+                for word, pos in pos_tags 
+                if pos in ['NNP', 'NNPS'] 
+                and word.isalnum() 
+                and len(word) > 2
+                and word.lower() not in self.stop_words
+            ]
+            
+            # Count frequency
+            entity_counter = Counter(proper_nouns)
+            
+            entities = []
+            for entity, count in entity_counter.most_common(10):
+                entities.append({
+                    'topic': entity,
+                    'score': count / len(proper_nouns) if proper_nouns else 0,
+                    'type': 'entity',
+                    'frequency': count
+                })
+            
+            return entities
+        except Exception as e:
+            print(f"⚠️  NLTK proper noun extraction error: {e}")
+            return []
+    
     def _extract_named_entities(self, text: str) -> List[Dict]:
         """
         Extract named entities (brands, products, technologies, etc.)
