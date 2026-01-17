@@ -648,6 +648,29 @@ async def full_analysis(request: FullAnalysisRequest):
                             topic_score = topic_data.get('score', 0.5)
                             match_score = topic_score * 100
                             
+                            # 生成模拟的 hashtags 和 subreddits（与上面相同的逻辑）
+                            topic_words = topic.lower().split()
+                            mock_hashtags = []
+                            for word in topic_words[:3]:
+                                if len(word) > 3:
+                                    hashtag = word.replace(' ', '').title()
+                                    mock_hashtags.append(hashtag)
+                            if not mock_hashtags:
+                                mock_hashtags = [topic.replace(' ', '').title()[:20]]
+                            
+                            mock_subreddits = []
+                            topic_lower = topic.lower()
+                            if any(word in topic_lower for word in ['trading', 'stock', 'invest', 'finance']):
+                                mock_subreddits = ['stocks', 'investing', 'wallstreetbets']
+                            elif any(word in topic_lower for word in ['tech', 'software', 'programming', 'code']):
+                                mock_subreddits = ['technology', 'programming', 'software']
+                            elif any(word in topic_lower for word in ['game', 'gaming', 'play']):
+                                mock_subreddits = ['gaming', 'games', 'pcgaming']
+                            elif any(word in topic_lower for word in ['video', 'youtube', 'content']):
+                                mock_subreddits = ['videos', 'youtube', 'content']
+                            else:
+                                mock_subreddits = ['videos', 'technology', 'gaming']
+                            
                             # 使用与 predictive_recommender 相同的格式
                             recommendations.append({
                                 'keyword': topic,
@@ -669,9 +692,9 @@ async def full_analysis(request: FullAnalysisRequest):
                                 'urgency': 'high' if match_score >= 80 else ('medium' if match_score >= 60 else 'normal'),
                                 'sources': ['channel_analysis'],
                                 'related_info': {
-                                    'rising_queries': [],
-                                    'hashtags': [],
-                                    'subreddits': []
+                                    'rising_queries': [topic],
+                                    'hashtags': mock_hashtags[:5],
+                                    'subreddits': mock_subreddits[:3]
                                 }
                             })
             
