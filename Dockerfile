@@ -25,7 +25,10 @@ RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r backend/requirements_v2.txt
 
 # 下载 NLTK 数据（包括 punkt_tab for NLTK 3.8.1+）
-RUN python -m nltk.downloader -d /usr/local/share/nltk_data punkt punkt_tab stopwords averaged_perceptron_tagger wordnet
+# 设置 NLTK_DATA 环境变量，确保数据下载到正确位置
+ENV NLTK_DATA=/usr/local/share/nltk_data
+RUN python -c "import nltk; nltk.download('punkt', quiet=True); nltk.download('punkt_tab', quiet=True); nltk.download('stopwords', quiet=True); nltk.download('averaged_perceptron_tagger', quiet=True); nltk.download('wordnet', quiet=True)" && \
+    python -c "import nltk; nltk.data.path.append('/usr/local/share/nltk_data')"
 
 # 复制应用代码
 COPY backend/ backend/

@@ -55,6 +55,14 @@ except ImportError:
 
 # Download required NLTK data
 # NLTK 3.8.1+ uses punkt_tab instead of punkt
+import os
+
+# Set NLTK data path
+nltk_data_path = os.getenv('NLTK_DATA', '/usr/local/share/nltk_data')
+if nltk_data_path not in nltk.data.path:
+    nltk.data.path.append(nltk_data_path)
+
+# Check and download NLTK data
 try:
     nltk.data.find('tokenizers/punkt_tab')
 except LookupError:
@@ -62,11 +70,21 @@ except LookupError:
         nltk.data.find('tokenizers/punkt')
     except LookupError:
         # Download both for compatibility
-        nltk.download('punkt', quiet=True)
-        nltk.download('punkt_tab', quiet=True)
-        nltk.download('stopwords', quiet=True)
-        nltk.download('averaged_perceptron_tagger', quiet=True)
-        nltk.download('wordnet', quiet=True)
+        print("📦 Downloading NLTK punkt resources...")
+        try:
+            nltk.download('punkt', quiet=True)
+        except Exception as e:
+            print(f"⚠️ punkt download failed: {e}")
+        try:
+            nltk.download('punkt_tab', quiet=True)
+        except Exception as e:
+            print(f"⚠️ punkt_tab download failed: {e}")
+        try:
+            nltk.download('stopwords', quiet=True)
+            nltk.download('averaged_perceptron_tagger', quiet=True)
+            nltk.download('wordnet', quiet=True)
+        except Exception as e:
+            print(f"⚠️ Other NLTK data download failed: {e}")
 
 # Load spaCy model (if available)
 if SPACY_AVAILABLE:

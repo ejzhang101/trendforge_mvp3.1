@@ -26,19 +26,41 @@ for mod in modules_to_clear:
 
 # Ensure NLTK data is downloaded before importing analyzers
 import nltk
+import os
+
+# Set NLTK data path
+nltk_data_path = os.getenv('NLTK_DATA', '/usr/local/share/nltk_data')
+if nltk_data_path not in nltk.data.path:
+    nltk.data.path.append(nltk_data_path)
+
+# Download NLTK data if missing
 try:
     nltk.data.find('tokenizers/punkt_tab')
+    print("✅ NLTK punkt_tab found")
 except LookupError:
     try:
         nltk.data.find('tokenizers/punkt')
+        print("✅ NLTK punkt found (legacy)")
     except LookupError:
         print("📦 Downloading NLTK data...")
-        nltk.download('punkt', quiet=True)
-        nltk.download('punkt_tab', quiet=True)
-        nltk.download('stopwords', quiet=True)
-        nltk.download('averaged_perceptron_tagger', quiet=True)
-        nltk.download('wordnet', quiet=True)
-        print("✅ NLTK data downloaded")
+        try:
+            nltk.download('punkt', quiet=True)
+            print("  ✅ punkt downloaded")
+        except Exception as e:
+            print(f"  ⚠️ punkt download failed: {e}")
+        try:
+            nltk.download('punkt_tab', quiet=True)
+            print("  ✅ punkt_tab downloaded")
+        except Exception as e:
+            print(f"  ⚠️ punkt_tab download failed: {e}")
+        try:
+            nltk.download('stopwords', quiet=True)
+            nltk.download('averaged_perceptron_tagger', quiet=True)
+            nltk.download('wordnet', quiet=True)
+            print("  ✅ Other NLTK data downloaded")
+        except Exception as e:
+            print(f"  ⚠️ Other NLTK data download failed: {e}")
+        print("✅ NLTK data download completed")
 
 from services.enhanced_youtube_analyzer import (
     analyze_channel_deeply,
