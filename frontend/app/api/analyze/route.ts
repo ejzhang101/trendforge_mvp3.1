@@ -110,9 +110,14 @@ export async function POST(request: NextRequest) {
     console.log('✅ Channel data collected:', analysis.channelId);
 
     // Step 2: Call enhanced backend for full analysis
-    const backendUrl = process.env.BACKEND_SERVICE_URL || 'http://localhost:8000';
+    let backendUrl = process.env.BACKEND_SERVICE_URL || 'http://localhost:8000';
     
-    console.log('🌐 Calling enhanced backend...');
+    // Ensure URL has protocol (fix for Railway URLs without https://)
+    if (backendUrl && !backendUrl.startsWith('http://') && !backendUrl.startsWith('https://')) {
+      backendUrl = `https://${backendUrl}`;
+    }
+    
+    console.log('🌐 Calling enhanced backend...', backendUrl);
     
     // Create AbortController for timeout handling (4 minutes - increased for social API delays)
     const controller = new AbortController();
