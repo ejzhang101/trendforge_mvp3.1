@@ -45,7 +45,7 @@ print(f"✅ Using audience_analyzer: {type(audience_analyzer).__name__}")
 print(f"✅ Analyzer has extract_topics_from_titles: {hasattr(content_analyzer, 'extract_topics_from_titles')}")
 print(f"✅ Analyzer has _extract_proper_nouns: {hasattr(content_analyzer, '_extract_proper_nouns')}")
 print(f"✅ Analyzer has _extract_proper_nouns_nltk: {hasattr(content_analyzer, '_extract_proper_nouns_nltk')} (should be False)")
-# Try to use enhanced social collector (MVP 3.0), fallback to original
+# Try to use enhanced social collector (MVP 3.1), fallback to original
 try:
     from services.enhanced_social_collector import EnhancedSocialMediaAggregator
     USE_ENHANCED_COLLECTOR = True
@@ -55,7 +55,7 @@ except ImportError:
     USE_ENHANCED_COLLECTOR = False
     print("⚠️ Using original Social Media Collector")
 
-# Try to use predictive recommendation engine (MVP 3.0), fallback to original
+# Try to use predictive recommendation engine (MVP 3.1), fallback to original
 try:
     from services.predictive_recommender import PredictiveRecommendationEngine
     predictive_recommender = PredictiveRecommendationEngine()
@@ -98,7 +98,7 @@ except ImportError:
     SEMANTIC_ANALYZER_AVAILABLE = False
     print("⚠️  Semantic Analyzer not available, using TF-IDF only")
 
-# Import Prophet predictor for MVP 3.0
+# Import Prophet predictor for MVP 3.1
 try:
     from services.trend_predictor import trend_predictor, PROPHET_AVAILABLE
     if PROPHET_AVAILABLE:
@@ -142,7 +142,7 @@ from services.backtest_analyzer import BacktestAnalyzer
 backtest_analyzer = BacktestAnalyzer(recommendation_engine, social_aggregator)
 print("✅ Backtest Analyzer loaded (MVP 2.0)")
 
-# Initialize script generator (MVP 3.0 feature)
+# Initialize script generator (MVP 3.1 feature)
 try:
     from services.script_generator import script_generator
     SCRIPT_GENERATOR_AVAILABLE = True
@@ -207,7 +207,7 @@ class TitleGenerationRequest(BaseModel):
     count: int = 3
 
 
-# MVP 3.0: Prediction request models
+# MVP 3.1: Prediction request models
 class TrendPredictionRequest(BaseModel):
     """Request model for Prophet trend predictions"""
     keywords: List[str]
@@ -556,7 +556,7 @@ async def full_analysis(request: FullAnalysisRequest):
         try:
             # 即使没有社交媒体趋势，也基于频道分析生成推荐
             if social_trends_data['merged_trends']:
-                # Use predictive engine if available (MVP 3.0)
+                # Use predictive engine if available (MVP 3.1)
                 if USE_PREDICTIVE_ENGINE:
                     recommendations = predictive_recommender.generate_recommendations(
                         channel_analysis,
@@ -976,7 +976,7 @@ async def full_analysis(request: FullAnalysisRequest):
             response["backtest"] = None
             response["backtest_status"] = backtest_status
         
-        # Add trend predictions and emerging trends (MVP 3.0)
+        # Add trend predictions and emerging trends (MVP 3.1)
         # Always include these fields, even if empty, for frontend consistency
         if request.enable_predictions and PROPHET_AVAILABLE:
             response["trend_predictions"] = trend_predictions if trend_predictions else []
@@ -1075,7 +1075,7 @@ async def health_check():
     }
 
 
-# ==================== MVP 3.0: Prophet Prediction Endpoints ====================
+# ==================== MVP 3.1: Prophet Prediction Endpoints ====================
 
 @app.get("/api/v3/debug-runtime")
 async def debug_runtime():
@@ -1109,7 +1109,7 @@ async def debug_runtime():
 @app.post("/api/v3/predict-trends")
 async def predict_trends(request: TrendPredictionRequest):
     """
-    🔮 MVP 3.0: Predict future trends using Prophet time series forecasting
+    🔮 MVP 3.1: Predict future trends using Prophet time series forecasting
     
     Returns 7-day forecast with confidence intervals, trend direction, and peak timing
     """
@@ -1146,7 +1146,7 @@ async def predict_trends(request: TrendPredictionRequest):
 @app.post("/api/v3/store-trend-data")
 async def store_trend_data(request: StoreTrendDataRequest):
     """
-    🔮 MVP 3.0: Store current trend data for future predictions
+    🔮 MVP 3.1: Store current trend data for future predictions
     
     This endpoint allows you to store historical trend data that will be used
     to improve future predictions. Data is stored in the database configured
@@ -1174,7 +1174,7 @@ async def store_trend_data(request: StoreTrendDataRequest):
 @app.post("/api/v3/generate-scripts")
 async def generate_scripts(request: ScriptGenerationRequest):
     """
-    ✍️ MVP 3.0: Generate video scripts based on channel analysis and recommendations
+    ✍️ MVP 3.1: Generate video scripts based on channel analysis and recommendations
     
     Generates multiple script variations based on:
     - User product/service description
@@ -1218,7 +1218,7 @@ async def generate_scripts(request: ScriptGenerationRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    version_str = "MVP 3.1 (Prophet + LLM)" if PROPHET_AVAILABLE else "MVP 2.0"
+    version_str = "MVP 3.1 (Prophet + LLM + ML)" if PROPHET_AVAILABLE else "MVP 2.0"
     print(f"🚀 Starting TrendForge Backend ({version_str})")
     if PROPHET_AVAILABLE:
         print("   ✅ Prophet time series prediction enabled")
