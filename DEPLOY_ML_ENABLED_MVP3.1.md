@@ -78,6 +78,18 @@ git push origin main
 
 Render 会自动检测并开始构建。
 
+## ⚠️ 本地开发注意事项
+
+### macOS 用户
+
+XGBoost 需要 OpenMP 运行时库。在 macOS 上需要安装：
+
+```bash
+brew install libomp
+```
+
+**注意**：生产环境（Docker/Linux）不需要此步骤，Dockerfile 已包含必要的系统依赖。
+
 ## 🧪 本地测试
 
 ### 测试 1: 验证 ML 模块
