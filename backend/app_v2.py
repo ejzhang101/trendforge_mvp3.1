@@ -293,6 +293,45 @@ async def debug_analyzer():
     }
 
 
+@app.get("/debug/full-status")
+async def debug_full_status():
+    """完整系统状态诊断 - 用于对比 localhost 和生产环境"""
+    from services.enhanced_youtube_analyzer import content_analyzer, audience_analyzer
+    
+    return {
+        "backend_version": "3.1.0" if PROPHET_AVAILABLE else "2.0.1-quickfix",
+        "prophet_available": PROPHET_AVAILABLE,
+        "script_generator_available": SCRIPT_GENERATOR_AVAILABLE,
+        "analyzer_type": type(content_analyzer).__name__,
+        "audience_analyzer_type": type(audience_analyzer).__name__,
+        "recommendation_engine": "PredictiveRecommendationEngine" if USE_PREDICTIVE_ENGINE else "TopicRecommendationEngine",
+        "social_aggregator": "EnhancedSocialMediaAggregator" if USE_ENHANCED_COLLECTOR else "SocialMediaAggregator",
+        "environment_vars": {
+            "TWITTER_BEARER_TOKEN": bool(os.getenv('TWITTER_BEARER_TOKEN')),
+            "REDDIT_CLIENT_ID": bool(os.getenv('REDDIT_CLIENT_ID')),
+            "REDDIT_CLIENT_SECRET": bool(os.getenv('REDDIT_CLIENT_SECRET')),
+            "SERPAPI_KEY": bool(os.getenv('SERPAPI_KEY')),
+            "OPENAI_API_KEY": bool(os.getenv('OPENAI_API_KEY')),
+            "YOUTUBE_API_KEY": bool(os.getenv('YOUTUBE_API_KEY')),
+            "DATABASE_URL": bool(os.getenv('DATABASE_URL')),
+            "REDIS_URL": bool(os.getenv('REDIS_URL')),
+        },
+        "features": {
+            "lightweight_analyzer": type(content_analyzer).__name__ == "LightweightContentAnalyzer",
+            "predictive_recommendations": USE_PREDICTIVE_ENGINE,
+            "prophet_predictions": PROPHET_AVAILABLE,
+            "llm_script_generation": SCRIPT_GENERATOR_AVAILABLE,
+            "enhanced_social_collector": USE_ENHANCED_COLLECTOR,
+        },
+        "data_calculation": {
+            "viral_potential_calculation": "enhanced_with_data_quality_bonus",
+            "predicted_views_calculation": "multi_factor_dynamic",
+            "mock_data_generation": "channel_performance_based",
+        },
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+
 @app.post("/api/v2/analyze-channel")
 async def analyze_channel_endpoint(request: ChannelAnalysisRequest):
     """
