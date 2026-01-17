@@ -330,11 +330,22 @@ export async function GET(
           },
         ],
         sources: recData?.sources || ['database'],
-          relatedInfo: recData?.relatedInfo || {
-            rising_queries: trendData.relatedKeywords || [],
-            hashtags: recData?.relatedInfo?.hashtags || trendData.twitter_hashtags || [],
-            subreddits: recData?.relatedInfo?.subreddits || trendData.reddit_subreddits || [],
-          },
+          relatedInfo: (() => {
+            // 优先使用存储的 relatedInfo
+            if (recData?.relatedInfo) {
+              return {
+                rising_queries: recData.relatedInfo.rising_queries || [],
+                hashtags: recData.relatedInfo.hashtags || recData.relatedInfo.twitter_hashtags || [],
+                subreddits: recData.relatedInfo.subreddits || recData.relatedInfo.reddit_subreddits || [],
+              };
+            }
+            // 如果没有存储的 relatedInfo，尝试从 trendData 中获取
+            return {
+              rising_queries: trendData.relatedKeywords || [],
+              hashtags: trendData.twitter_hashtags || [],
+              subreddits: trendData.reddit_subreddits || [],
+            };
+          })(),
           // MVP 3.0: Add prediction data if available
           prediction: recData?.prediction || null,
         };
