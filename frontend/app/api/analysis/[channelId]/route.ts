@@ -332,8 +332,8 @@ export async function GET(
         sources: recData?.sources || ['database'],
           relatedInfo: recData?.relatedInfo || {
             rising_queries: trendData.relatedKeywords || [],
-            hashtags: [],
-            subreddits: [],
+            hashtags: recData?.relatedInfo?.hashtags || trendData.twitter_hashtags || [],
+            subreddits: recData?.relatedInfo?.subreddits || trendData.reddit_subreddits || [],
           },
           // MVP 3.0: Add prediction data if available
           prediction: recData?.prediction || null,
