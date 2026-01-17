@@ -151,11 +151,25 @@ class LightweightContentAnalyzer:
             # 给短语更高的权重
             tfidf_scores[bigram] = count * 1.5
         
-        # 5. 排序并返回
+        # 5. 归一化分数到 0-1 范围
+        if tfidf_scores:
+            max_score = max(tfidf_scores.values())
+            min_score = min(tfidf_scores.values())
+            score_range = max_score - min_score if max_score > min_score else 1.0
+            
+            # 归一化: (score - min) / range
+            normalized_scores = {
+                word: (score - min_score) / score_range if score_range > 0 else 0.5
+                for word, score in tfidf_scores.items()
+            }
+        else:
+            normalized_scores = {}
+        
+        # 6. 排序并返回
         topics = [
             {
                 'topic': word,
-                'score': float(score),
+                'score': float(normalized_scores.get(word, 0.0)),  # 使用归一化后的分数
                 'type': 'tfidf',
                 'frequency': word_freq.get(word, bigrams.get(word, 1))
             }
