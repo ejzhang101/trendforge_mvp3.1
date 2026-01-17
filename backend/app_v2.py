@@ -514,20 +514,41 @@ async def full_analysis(request: FullAnalysisRequest):
                 recommendations = []
                 
                 # 创建模拟的社交趋势数据，使用频道主题
+                # 改进：基于频道主题分数和频道表现生成更合理的模拟数据
                 mock_social_trends = []
-                for topic_data in channel_topics:
+                high_performers = channel_analysis.get('high_performers', {})
+                avg_views = high_performers.get('avg_views', high_performers.get('median_views', 10000))
+                
+                for idx, topic_data in enumerate(channel_topics):
                     topic = topic_data.get('topic', '')
                     if topic:
-                        # 创建模拟趋势数据，基于频道主题分数
                         topic_score = topic_data.get('score', 0.5)
+                        
+                        # 改进的模拟数据生成逻辑：
+                        # 1. composite_score: 基于主题分数，但考虑频道表现
+                        #    高表现频道 + 高主题分数 = 更高的热度
+                        channel_performance_factor = min(1.2, avg_views / 50000)  # 频道表现系数
+                        base_composite = topic_score * 100
+                        # 对于高表现频道，给予更高的基础热度
+                        composite_score = min(100, base_composite * (0.8 + channel_performance_factor * 0.2))
+                        
+                        # 2. growth_rate: 基于主题分数和排名
+                        #    排名越靠前，增长率越高（模拟新兴趋势）
+                        rank_factor = (len(channel_topics) - idx) / len(channel_topics)  # 排名因子
+                        growth_rate = topic_score * 30 + rank_factor * 20  # 30-50 范围
+                        
+                        # 3. 添加更多上下文信息
                         mock_trend = {
                             'keyword': topic,
-                            'composite_score': topic_score * 100,  # 基于主题分数
-                            'growth_rate': topic_score * 50,  # 模拟增长率
+                            'composite_score': round(composite_score, 2),
+                            'growth_rate': round(growth_rate, 2),
                             'sources': ['channel_analysis'],
-                            'rising_queries': [],
+                            'rising_queries': [topic],  # 至少包含关键词本身
                             'twitter_hashtags': [],
-                            'reddit_subreddits': []
+                            'reddit_subreddits': [],
+                            'trend_score': round(composite_score, 2),  # 兼容字段
+                            'interest_over_time': [],  # 时间序列数据（空，因为没有真实数据）
+                            'related_queries': []  # 相关查询（空）
                         }
                         mock_social_trends.append(mock_trend)
                 

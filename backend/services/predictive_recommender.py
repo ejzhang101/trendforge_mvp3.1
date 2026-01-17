@@ -354,17 +354,44 @@ class PredictiveRecommendationEngine:
         }
     
     def _calculate_viral_potential(self, trend: Dict) -> float:
-        """互联网热度计算"""
+        """
+        互联网热度计算
+        
+        改进算法：
+        - 基础分数：composite_score（来自社交媒体聚合）
+        - 增长加成：growth_rate（趋势增长率）
+        - 平台加成：多平台验证（Twitter + Reddit + Google Trends）
+        - 数据质量加成：如果有真实社交媒体数据，给予额外加成
+        """
         composite_score = trend.get('composite_score', 0)
         growth_rate = trend.get('growth_rate', 0)
-        source_count = len(trend.get('sources', []))
+        sources = trend.get('sources', [])
+        source_count = len(sources)
         
+        # 检查是否有真实的社交媒体数据（不是 channel_analysis）
+        has_real_social_data = any(
+            source not in ['channel_analysis', 'database'] 
+            for source in sources
+        )
+        
+        # 基础分数
         base_score = composite_score
-        growth_bonus = min(30, growth_rate * 0.3)
-        platform_bonus = min(20, (source_count - 1) * 10)
         
-        viral_score = base_score + growth_bonus + platform_bonus
-        return min(100, round(viral_score, 2))
+        # 增长加成（基于增长率，但有限制）
+        growth_bonus = min(30, max(0, growth_rate) * 0.3)
+        
+        # 平台加成（多平台验证）
+        platform_bonus = min(20, (source_count - 1) * 10) if source_count > 1 else 0
+        
+        # 数据质量加成（如果有真实社交媒体数据）
+        data_quality_bonus = 5 if has_real_social_data else 0
+        
+        viral_score = base_score + growth_bonus + platform_bonus + data_quality_bonus
+        
+        # 确保分数在合理范围内
+        viral_score = max(20, min(100, round(viral_score, 2)))
+        
+        return viral_score
     
     def _calculate_performance_potential(self, trend, high_performers, 
                                         channel_topics, content_style, 
