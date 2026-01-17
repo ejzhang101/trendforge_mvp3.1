@@ -508,34 +508,81 @@ async def full_analysis(request: FullAnalysisRequest):
                     )
             else:
                 # 如果没有社交媒体趋势，基于频道主题生成推荐
+                # 使用 predictive_recommender 确保数据格式一致
                 print("   ℹ️ No social trends, generating recommendations from channel topics...")
                 channel_topics = channel_analysis.get('topics', [])[:request.max_recommendations]
                 recommendations = []
                 
+                # 创建模拟的社交趋势数据，使用频道主题
+                mock_social_trends = []
                 for topic_data in channel_topics:
                     topic = topic_data.get('topic', '')
                     if topic:
-                        recommendations.append({
+                        # 创建模拟趋势数据，基于频道主题分数
+                        topic_score = topic_data.get('score', 0.5)
+                        mock_trend = {
                             'keyword': topic,
-                            'match_score': topic_data.get('score', 0) * 100,
-                            'viral_potential': 50,  # 默认中等热度
-                            'performance_score': 70,  # 基于频道表现
-                            'relevance_score': 90,  # 高度相关（来自频道主题）
-                            'opportunity_score': 60,
-                            'composite_social_score': 0,  # 无社交媒体数据
-                            'reasoning': f"基于频道内容分析，'{topic}' 是该频道的核心主题之一",
-                            'content_angle': f"深入探讨 {topic} 的相关内容",
-                            'predicted_performance': {
-                                'tier': 'good',
-                                'predicted_views': channel_analysis.get('high_performers', {}).get('avg_views', 10000),
-                                'description': '基于频道主题的推荐，预计表现良好',
-                                'confidence': 70
-                            },
-                            'suggested_format': channel_analysis.get('content_style', {}).get('format', 'tutorial'),
-                            'urgency': 'normal',
-                            'sources': [],
-                            'related_info': {}
-                        })
+                            'composite_score': topic_score * 100,  # 基于主题分数
+                            'growth_rate': topic_score * 50,  # 模拟增长率
+                            'sources': ['channel_analysis'],
+                            'rising_queries': [],
+                            'twitter_hashtags': [],
+                            'reddit_subreddits': []
+                        }
+                        mock_social_trends.append(mock_trend)
+                
+                # 使用 predictive_recommender 生成推荐（确保格式一致）
+                if USE_PREDICTIVE_ENGINE and mock_social_trends:
+                    recommendations = predictive_recommender.generate_recommendations(
+                        channel_analysis,
+                        mock_social_trends,
+                        request.max_recommendations,
+                        enable_predictions=request.enable_predictions and PROPHET_AVAILABLE
+                    )
+                elif mock_social_trends:
+                    # Fallback to intelligent_recommender
+                    recommendations = recommendation_engine.generate_recommendations(
+                        channel_analysis,
+                        mock_social_trends,
+                        request.max_recommendations
+                    )
+                else:
+                    # 最后的 fallback：手动生成基础推荐
+                    high_performers = channel_analysis.get('high_performers', {})
+                    avg_views = high_performers.get('avg_views', high_performers.get('median_views', 10000))
+                    
+                    for topic_data in channel_topics:
+                        topic = topic_data.get('topic', '')
+                        if topic:
+                            topic_score = topic_data.get('score', 0.5)
+                            match_score = topic_score * 100
+                            
+                            # 使用与 predictive_recommender 相同的格式
+                            recommendations.append({
+                                'keyword': topic,
+                                'match_score': match_score,
+                                'viral_potential': 50 + (topic_score * 30),  # 50-80 范围
+                                'performance_score': 60 + (topic_score * 30),  # 60-90 范围
+                                'relevance_score': 80 + (topic_score * 20),  # 80-100 范围（高度相关）
+                                'opportunity_score': 50 + (topic_score * 30),
+                                'composite_social_score': 0,  # 无社交媒体数据
+                                'reasoning': f"基于频道内容分析，'{topic}' 是该频道的核心主题之一，与频道风格高度匹配",
+                                'content_angle': f"深入探讨 {topic} 的相关内容，结合频道特色",
+                                'predicted_performance': {
+                                    'tier': 'good' if match_score >= 60 else 'moderate',
+                                    'predicted_views': int(avg_views * (0.8 + topic_score * 0.4)),  # 动态计算
+                                    'description': '基于频道主题的推荐，预计表现良好' if match_score >= 60 else '预计表现中等，稳定流量',
+                                    'confidence': int(match_score)
+                                },
+                                'suggested_format': channel_analysis.get('content_style', {}).get('primary_style', 'tutorial'),
+                                'urgency': 'high' if match_score >= 80 else ('medium' if match_score >= 60 else 'normal'),
+                                'sources': ['channel_analysis'],
+                                'related_info': {
+                                    'rising_queries': [],
+                                    'hashtags': [],
+                                    'subreddits': []
+                                }
+                            })
             
             # Generate titles for all recommendations
             for rec in recommendations[:min(5, len(recommendations))]:
