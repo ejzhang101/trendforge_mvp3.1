@@ -274,8 +274,22 @@ class LightweightContentAnalyzer:
         
         # 多方法验证的主题加分
         for topic_data in topic_map.values():
-            method_bonus = topic_data.get('methods', 1) * 0.2
+            method_bonus = (topic_data.get('methods', 1) - 1) * 0.1  # 每多一个方法 +0.1
             topic_data['score'] = topic_data['score'] * (1 + method_bonus)
+        
+        # 归一化所有分数到 0-1 范围
+        if topic_map:
+            all_scores = [t['score'] for t in topic_map.values()]
+            max_score = max(all_scores) if all_scores else 1.0
+            min_score = min(all_scores) if all_scores else 0.0
+            score_range = max_score - min_score if max_score > min_score else 1.0
+            
+            # 归一化每个主题的分数
+            for topic_data in topic_map.values():
+                if score_range > 0:
+                    topic_data['score'] = (topic_data['score'] - min_score) / score_range
+                else:
+                    topic_data['score'] = 0.5  # 默认值
         
         # 排序
         ranked_topics = sorted(
