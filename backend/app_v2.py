@@ -1,5 +1,5 @@
 """
-TrendForge AI Backend - MVP 3.0
+TrendForge AI Backend - MVP 3.1
 Deep content analysis with social media trends + Prophet time series prediction
 """
 
@@ -49,7 +49,7 @@ print(f"✅ Analyzer has _extract_proper_nouns_nltk: {hasattr(content_analyzer, 
 try:
     from services.enhanced_social_collector import EnhancedSocialMediaAggregator
     USE_ENHANCED_COLLECTOR = True
-    print("✅ Using Enhanced Social Media Collector (MVP 3.0)")
+    print("✅ Using Enhanced Social Media Collector (MVP 3.1)")
 except ImportError:
     from services.social_media_collector import SocialMediaAggregator
     USE_ENHANCED_COLLECTOR = False
@@ -60,7 +60,7 @@ try:
     from services.predictive_recommender import PredictiveRecommendationEngine
     predictive_recommender = PredictiveRecommendationEngine()
     USE_PREDICTIVE_ENGINE = True
-    print("✅ Using Predictive Recommendation Engine (MVP 3.0 with Prophet)")
+    print("✅ Using Predictive Recommendation Engine (MVP 3.1 with Prophet + ML)")
     # Also import original engine for backtest analyzer compatibility
     from services.intelligent_recommender import (
         recommendation_engine,
@@ -102,7 +102,7 @@ except ImportError:
 try:
     from services.trend_predictor import trend_predictor, PROPHET_AVAILABLE
     if PROPHET_AVAILABLE:
-        print("✅ Prophet Prediction Engine loaded (MVP 3.0)")
+        print("✅ Prophet Prediction Engine loaded (MVP 3.1)")
     else:
         print("⚠️ Prophet not installed, predictions will be disabled")
 except ImportError:
@@ -146,14 +146,14 @@ print("✅ Backtest Analyzer loaded (MVP 2.0)")
 try:
     from services.script_generator import script_generator
     SCRIPT_GENERATOR_AVAILABLE = True
-    print("✅ Script Generator loaded (MVP 3.0)")
+    print("✅ Script Generator loaded (MVP 3.1)")
 except ImportError:
     script_generator = None
     SCRIPT_GENERATOR_AVAILABLE = False
     print("⚠️ Script Generator not available")
 
 app = FastAPI(
-    title="TrendForge AI Backend - MVP 3.1 (Prophet + LLM Script Generation)",
+    title="TrendForge AI Backend - MVP 3.1 (Prophet + LLM + ML)",
     version="3.1.0",
     description="Intelligent YouTube trend prediction with deep content analysis and AI-powered script generation"
 )
@@ -222,7 +222,7 @@ class StoreTrendDataRequest(BaseModel):
 
 class FullAnalysisRequest(BaseModel):
     """
-    Complete analysis request combining all steps (MVP 3.0+)
+    Complete analysis request combining all steps (MVP 3.1)
     """
     videos: List[Dict]
     channel_data: Dict
@@ -230,7 +230,7 @@ class FullAnalysisRequest(BaseModel):
     analyze_transcripts: bool = False
     max_recommendations: int = 10
     enable_backtest: bool = True  # 启用回测分析 (MVP 2.0)
-    enable_predictions: bool = True  # 启用 Prophet 预测 (MVP 3.0)
+    enable_predictions: bool = True  # 启用 Prophet 预测 (MVP 3.1)
     use_simple_mode: bool = False  # 简单模式：跳过社交趋势收集（默认关闭，使用完整分析）
     use_ml_prediction: bool = False  # 新增：是否使用 ML (XGBoost) 预测（默认 False，保持兼容）
     use_semantic_keywords: bool = False  # 新增：是否使用语义分析 (KeyBERT)（默认 False，保持兼容）
@@ -238,7 +238,7 @@ class FullAnalysisRequest(BaseModel):
 
 class ScriptGenerationRequest(BaseModel):
     """
-    Request model for video script generation (MVP 3.0)
+    Request model for video script generation (MVP 3.1)
     """
     user_prompt: str  # 用户输入的产品/服务描述
     channel_analysis: Dict  # 频道分析数据
