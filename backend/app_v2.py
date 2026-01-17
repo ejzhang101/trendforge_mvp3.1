@@ -264,6 +264,35 @@ async def root():
     }
 
 
+@app.get("/debug/analyzer")
+async def debug_analyzer():
+    """检查分析器状态 - 调试端点"""
+    from services.enhanced_youtube_analyzer import content_analyzer, audience_analyzer
+    
+    analyzer_class = type(content_analyzer).__name__
+    audience_class = type(audience_analyzer).__name__
+    
+    # 检查方法是否存在
+    has_extract_topics = hasattr(content_analyzer, 'extract_topics_from_titles')
+    has_extract_proper_nouns = hasattr(content_analyzer, '_extract_proper_nouns')
+    has_extract_proper_nouns_nltk = hasattr(content_analyzer, '_extract_proper_nouns_nltk')
+    
+    # 获取所有方法
+    methods = [m for m in dir(content_analyzer) if not m.startswith('__')]
+    
+    return {
+        "analyzer_class": analyzer_class,
+        "audience_class": audience_class,
+        "has_extract_topics": has_extract_topics,
+        "has_extract_proper_nouns": has_extract_proper_nouns,
+        "has_extract_proper_nouns_nltk": has_extract_proper_nouns_nltk,
+        "expected_class": "LightweightContentAnalyzer",
+        "is_correct": analyzer_class == "LightweightContentAnalyzer",
+        "methods_count": len(methods),
+        "sample_methods": methods[:10]
+    }
+
+
 @app.post("/api/v2/analyze-channel")
 async def analyze_channel_endpoint(request: ChannelAnalysisRequest):
     """
