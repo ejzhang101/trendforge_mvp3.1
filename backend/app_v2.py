@@ -732,9 +732,9 @@ async def full_analysis(request: FullAnalysisRequest):
             "status": "not_run"
         }
         
-        # 回测要求：至少10个视频，推荐50+个视频以获得更准确的结果
+        # 回测要求：至少10个视频，推荐70+个视频以获得更准确的结果
         min_videos_for_backtest = 10
-        recommended_videos = 50
+        recommended_videos = 70
         if request.enable_backtest and len(request.videos) >= min_videos_for_backtest and backtest_analyzer:
             print("📈 Step 4/5: Running backtest analysis...")
             step_start = datetime.utcnow()
@@ -742,8 +742,8 @@ async def full_analysis(request: FullAnalysisRequest):
                 # Use ML model if sufficient data (>=20 videos)
                 use_ml = len(request.videos) >= 20
                 backtest_status["ml_enabled"] = use_ml
-                # Add timeout for backtest (60 seconds for 50+ videos)
-                timeout_seconds = 60.0 if len(request.videos) >= 50 else 30.0
+                # Add timeout for backtest (90 seconds for 70+ videos, 60 seconds for 50+, 30 seconds otherwise)
+                timeout_seconds = 90.0 if len(request.videos) >= 70 else (60.0 if len(request.videos) >= 50 else 30.0)
                 # backtest_predictions 现在是同步函数，直接在线程中调用
                 backtest_results = await asyncio.wait_for(
                     asyncio.to_thread(
