@@ -900,11 +900,16 @@ async def quick_analysis(videos: List[Dict], channel_data: Dict):
 async def health_check():
     """Enhanced health check with service status"""
     
+    # Check YouTube API key (used by frontend, but we can verify if it's configured)
+    youtube_api_key = os.getenv('YOUTUBE_API_KEY')
+    youtube_configured = bool(youtube_api_key)
+    
     social_status = {
         "twitter": social_aggregator.twitter.client is not None if hasattr(social_aggregator, 'twitter') else False,
         "reddit": social_aggregator.reddit.reddit is not None if hasattr(social_aggregator, 'reddit') else False,
         "google_trends": True,
         "serpapi": social_aggregator.serpapi.available if hasattr(social_aggregator, 'serpapi') else False,
+        "youtube": youtube_configured,  # YouTube API (used by frontend)
         "cache": (hasattr(social_aggregator, 'signal_aggregator') and 
                  hasattr(social_aggregator.signal_aggregator, 'cache') and 
                  social_aggregator.signal_aggregator.cache.redis_client is not None) or
@@ -914,6 +919,12 @@ async def health_check():
         "prophet": PROPHET_AVAILABLE and trend_predictor is not None,
         "script_generator": SCRIPT_GENERATOR_AVAILABLE and script_generator is not None
     }
+    
+    warnings = [
+        f"{service} not configured" 
+        for service, available in social_status.items() 
+        if not available and service not in ['cache', 'prophet']
+    ]
     
     return {
         "status": "healthy",
@@ -930,13 +941,10 @@ async def health_check():
             "cross_platform_verification": True,
             "time_series_prediction": PROPHET_AVAILABLE and trend_predictor is not None,
             "script_generation": SCRIPT_GENERATOR_AVAILABLE and script_generator is not None,
+            "youtube_data_collection": youtube_configured,  # YouTube API capability
         },
         "services": social_status,
-        "warnings": [
-            f"{service} not configured" 
-            for service, available in social_status.items() 
-            if not available and service not in ['cache', 'prophet']
-        ]
+        "warnings": warnings
     }
 
 
