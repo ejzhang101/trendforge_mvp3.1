@@ -75,6 +75,29 @@ except ImportError:
     predictive_recommender = None
     print("✅ Using Recommendation Engine (MVP 2.0)")
 
+# Check ML and Semantic Analysis availability (optional features)
+try:
+    from services.ml_performance_predictor import XGBOOST_AVAILABLE
+    ML_PREDICTOR_AVAILABLE = XGBOOST_AVAILABLE
+    if ML_PREDICTOR_AVAILABLE:
+        print("✅ ML Performance Predictor (XGBoost) available")
+    else:
+        print("⚠️  ML Performance Predictor (XGBoost) not available, using rule-based prediction")
+except ImportError:
+    ML_PREDICTOR_AVAILABLE = False
+    print("⚠️  ML Performance Predictor not available, using rule-based prediction")
+
+try:
+    from services.semantic_analyzer import KEYBERT_AVAILABLE
+    SEMANTIC_ANALYZER_AVAILABLE = KEYBERT_AVAILABLE
+    if SEMANTIC_ANALYZER_AVAILABLE:
+        print("✅ Semantic Analyzer (KeyBERT) available")
+    else:
+        print("⚠️  Semantic Analyzer (KeyBERT) not available, using TF-IDF only")
+except ImportError:
+    SEMANTIC_ANALYZER_AVAILABLE = False
+    print("⚠️  Semantic Analyzer not available, using TF-IDF only")
+
 # Import Prophet predictor for MVP 3.0
 try:
     from services.trend_predictor import trend_predictor, PROPHET_AVAILABLE
@@ -199,7 +222,7 @@ class StoreTrendDataRequest(BaseModel):
 
 class FullAnalysisRequest(BaseModel):
     """
-    Complete analysis request combining all steps (MVP 3.0)
+    Complete analysis request combining all steps (MVP 3.0+)
     """
     videos: List[Dict]
     channel_data: Dict
@@ -209,6 +232,8 @@ class FullAnalysisRequest(BaseModel):
     enable_backtest: bool = True  # 启用回测分析 (MVP 2.0)
     enable_predictions: bool = True  # 启用 Prophet 预测 (MVP 3.0)
     use_simple_mode: bool = False  # 简单模式：跳过社交趋势收集（默认关闭，使用完整分析）
+    use_ml_prediction: bool = False  # 新增：是否使用 ML (XGBoost) 预测（默认 False，保持兼容）
+    use_semantic_keywords: bool = False  # 新增：是否使用语义分析 (KeyBERT)（默认 False，保持兼容）
 
 
 class ScriptGenerationRequest(BaseModel):
@@ -537,7 +562,9 @@ async def full_analysis(request: FullAnalysisRequest):
                         channel_analysis,
                         social_trends_data['merged_trends'],
                         request.max_recommendations,
-                        enable_predictions=request.enable_predictions and PROPHET_AVAILABLE
+                        enable_predictions=request.enable_predictions and PROPHET_AVAILABLE,
+                        use_ml_prediction=request.use_ml_prediction,  # 新增：ML 预测
+                        use_semantic_keywords=request.use_semantic_keywords  # 新增：语义分析
                     )
                 else:
                     recommendations = recommendation_engine.generate_recommendations(
@@ -631,7 +658,9 @@ async def full_analysis(request: FullAnalysisRequest):
                         channel_analysis,
                         mock_social_trends,
                         request.max_recommendations,
-                        enable_predictions=request.enable_predictions and PROPHET_AVAILABLE
+                        enable_predictions=request.enable_predictions and PROPHET_AVAILABLE,
+                        use_ml_prediction=request.use_ml_prediction,  # 新增：ML 预测
+                        use_semantic_keywords=request.use_semantic_keywords  # 新增：语义分析
                     )
                 elif mock_social_trends:
                     # Fallback to intelligent_recommender
@@ -1013,7 +1042,9 @@ async def health_check():
                  hasattr(social_aggregator.cache, 'redis_client') and 
                  social_aggregator.cache.redis_client is not None),
         "prophet": PROPHET_AVAILABLE and trend_predictor is not None,
-        "script_generator": SCRIPT_GENERATOR_AVAILABLE and script_generator is not None
+        "script_generator": SCRIPT_GENERATOR_AVAILABLE and script_generator is not None,
+        "ml_predictor": ML_PREDICTOR_AVAILABLE if 'ML_PREDICTOR_AVAILABLE' in globals() else False,
+        "semantic_analyzer": SEMANTIC_ANALYZER_AVAILABLE if 'SEMANTIC_ANALYZER_AVAILABLE' in globals() else False
     }
     
     warnings = [

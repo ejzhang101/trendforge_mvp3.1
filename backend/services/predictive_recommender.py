@@ -1,6 +1,7 @@
 """
 Enhanced Intelligent Topic Recommendation Engine with Prophet Predictions
 MVP 3.0 - Predictive recommendations with time series forecasting
+MVP 3.1+ - Optional ML (XGBoost) and Semantic Analysis (KeyBERT) support
 """
 
 from typing import List, Dict, Optional
@@ -14,6 +15,23 @@ try:
 except ImportError:
     PROPHET_AVAILABLE = False
     print("⚠️ Prophet predictor not available")
+
+# Import ML Performance Predictor (optional)
+try:
+    from services.ml_performance_predictor import get_ml_performance_predictor
+    ML_PREDICTOR_AVAILABLE = True
+except ImportError:
+    ML_PREDICTOR_AVAILABLE = False
+    print("⚠️ ML Performance Predictor not available, using rule-based prediction")
+
+# Import Semantic Analyzer (optional)
+try:
+    from services.semantic_analyzer import get_semantic_analyzer
+    from services.enhanced_youtube_analyzer import content_analyzer
+    SEMANTIC_ANALYZER_AVAILABLE = True
+except ImportError:
+    SEMANTIC_ANALYZER_AVAILABLE = False
+    print("⚠️ Semantic Analyzer not available, using TF-IDF only")
 
 
 class PredictiveRecommendationEngine:
@@ -30,13 +48,21 @@ class PredictiveRecommendationEngine:
     def __init__(self):
         self.min_match_score = 30
         self.prophet = trend_predictor if PROPHET_AVAILABLE else None
+        
+        # Initialize optional ML and semantic modules (lazy loading)
+        self.ml_predictor = None
+        self.semantic_analyzer = None
+        self.ml_available = ML_PREDICTOR_AVAILABLE
+        self.semantic_available = SEMANTIC_ANALYZER_AVAILABLE
     
     def generate_recommendations(
         self,
         channel_analysis: Dict,
         social_trends: List[Dict],
         max_recommendations: int = 10,
-        enable_predictions: bool = True
+        enable_predictions: bool = True,
+        use_ml_prediction: bool = False,  # 新增：是否使用 ML 预测
+        use_semantic_keywords: bool = False  # 新增：是否使用语义分析
     ) -> List[Dict]:
         """
         Generate intelligent recommendations with predictive insights
@@ -58,6 +84,10 @@ class PredictiveRecommendationEngine:
         target_audience = channel_analysis.get('target_audience', {})
         high_performers = channel_analysis.get('high_performers', {})
         
+        # Initialize optional modules if needed
+        if use_ml_prediction or use_semantic_keywords:
+            self._ensure_enhanced_modules_loaded(use_semantic_keywords)
+        
         # Generate base recommendations
         for trend in social_trends:
             match_result = self._calculate_match_score(
@@ -65,7 +95,9 @@ class PredictiveRecommendationEngine:
                 channel_topics,
                 content_style,
                 target_audience,
-                high_performers
+                high_performers,
+                use_ml_prediction=use_ml_prediction,
+                use_semantic_keywords=use_semantic_keywords
             )
             
             if match_result['match_score'] >= self.min_match_score:
@@ -267,13 +299,34 @@ class PredictiveRecommendationEngine:
         
         return f"{current_reasoning}；{insight}"
     
+    def _ensure_enhanced_modules_loaded(self, use_semantic: bool = False):
+        """延迟加载增强模块"""
+        if self.ml_available and self.ml_predictor is None:
+            try:
+                self.ml_predictor = get_ml_performance_predictor()
+                print("✅ ML Performance Predictor loaded")
+            except Exception as e:
+                print(f"⚠️  Failed to load ML Predictor: {e}")
+                self.ml_available = False
+        
+        if use_semantic and self.semantic_available and self.semantic_analyzer is None:
+            try:
+                from services.enhanced_youtube_analyzer import content_analyzer
+                self.semantic_analyzer = get_semantic_analyzer(content_analyzer)
+                print("✅ Semantic Analyzer loaded")
+            except Exception as e:
+                print(f"⚠️  Failed to load Semantic Analyzer: {e}")
+                self.semantic_available = False
+    
     def _calculate_match_score(
         self,
         trend: Dict,
         channel_topics: List[str],
         content_style: Dict,
         target_audience: Dict,
-        high_performers: Dict
+        high_performers: Dict,
+        use_ml_prediction: bool = False,
+        use_semantic_keywords: bool = False
     ) -> Dict:
         """
         Calculate comprehensive match score between trend and channel
@@ -298,7 +351,11 @@ class PredictiveRecommendationEngine:
         )
         
         # 3. 内容相关性 (Relevance Score)
-        topic_relevance = self._calculate_topic_relevance(keyword, channel_topics)
+        # 可选使用语义分析提升相关性计算
+        if use_semantic_keywords and self.semantic_analyzer:
+            topic_relevance = self._semantic_topic_relevance(keyword, channel_topics)
+        else:
+            topic_relevance = self._calculate_topic_relevance(keyword, channel_topics)
         style_score = self._calculate_style_compatibility(keyword, content_style)
         audience_score = self._calculate_audience_fit(keyword, target_audience)
         relevance_score = (topic_relevance * 0.5 + style_score * 0.3 + audience_score * 0.2)
@@ -325,14 +382,32 @@ class PredictiveRecommendationEngine:
         # Generate content angle
         content_angle = self._generate_content_angle(keyword, content_style, trend)
         
-        # Predict performance
-        predicted_performance = self._predict_performance(
-            match_score,
-            viral_potential,
-            performance_score,
-            relevance_score,
-            high_performers
-        )
+        # Predict performance (可选使用 ML)
+        if use_ml_prediction and self.ml_predictor and self.ml_available:
+            try:
+                predicted_performance = self._ml_predict_performance(
+                    keyword,
+                    {'high_performers': high_performers, 'target_audience': target_audience, 'channel_data': {}},
+                    trend,
+                    relevance_score
+                )
+            except Exception as e:
+                print(f"⚠️  ML prediction failed, using fallback: {e}")
+                predicted_performance = self._predict_performance(
+                    match_score,
+                    viral_potential,
+                    performance_score,
+                    relevance_score,
+                    high_performers
+                )
+        else:
+            predicted_performance = self._predict_performance(
+                match_score,
+                viral_potential,
+                performance_score,
+                relevance_score,
+                high_performers
+            )
         
         # Suggest format
         suggested_format = self._suggest_format(keyword, content_style)
@@ -352,6 +427,56 @@ class PredictiveRecommendationEngine:
             'suggested_format': suggested_format,
             'urgency': urgency
         }
+    
+    def _ml_predict_performance(
+        self,
+        keyword: str,
+        channel_analysis: Dict,
+        trend: Dict,
+        relevance_score: float
+    ) -> Dict:
+        """使用 ML 模型预测性能（如果可用）"""
+        try:
+            if not self.ml_predictor:
+                # 降级到规则方法
+                high_performers = channel_analysis.get('high_performers', {})
+                return self._predict_performance(
+                    50,  # 默认 match_score
+                    self._calculate_viral_potential(trend),
+                    50,  # 默认 performance_score
+                    relevance_score,
+                    high_performers
+                )
+            
+            # 使用 ML 预测器
+            ml_result = self.ml_predictor.predict_performance(
+                keyword=keyword,
+                channel_analysis=channel_analysis,
+                trend=trend,
+                relevance_score=relevance_score
+            )
+            
+            # 转换为标准格式
+            return {
+                'tier': ml_result.get('tier', 'moderate'),
+                'predicted_views': ml_result.get('predicted_views', 10000),
+                'description': ml_result.get('description', '预计表现中等'),
+                'confidence': ml_result.get('confidence', 0.7),
+                'method': ml_result.get('method', 'rule_based'),
+                'feature_importance': ml_result.get('feature_importance', {})
+            }
+            
+        except Exception as e:
+            print(f"⚠️  ML prediction failed, using fallback: {e}")
+            # 降级到规则方法
+            high_performers = channel_analysis.get('high_performers', {})
+            return self._predict_performance(
+                50,  # 默认 match_score
+                self._calculate_viral_potential(trend),
+                50,  # 默认 performance_score
+                relevance_score,
+                high_performers
+            )
     
     def _calculate_viral_potential(self, trend: Dict) -> float:
         """
@@ -422,8 +547,35 @@ class PredictiveRecommendationEngine:
         """机会分数"""
         return self._calculate_viral_potential(trend)
     
+    def _semantic_topic_relevance(self, keyword: str, channel_topics: List[str]) -> float:
+        """使用语义分析计算相关性（如果可用）"""
+        try:
+            if not self.semantic_analyzer or not channel_topics:
+                return self._calculate_topic_relevance(keyword, channel_topics)
+            
+            # 计算关键词与频道主题的语义相似度
+            similarities = self.semantic_analyzer.analyze_semantic_similarity(
+                query=keyword,
+                candidates=channel_topics[:10]  # Top 10 主题
+            )
+            
+            if not similarities:
+                return self._calculate_topic_relevance(keyword, channel_topics)
+            
+            # 使用最高相似度作为相关性
+            max_similarity = similarities[0]['similarity_score']
+            
+            # 转换为 0-100 分数
+            relevance = max_similarity * 100
+            
+            return min(100, max(20, relevance))
+            
+        except Exception as e:
+            print(f"⚠️  Semantic relevance failed, using fallback: {e}")
+            return self._calculate_topic_relevance(keyword, channel_topics)
+    
     def _calculate_topic_relevance(self, keyword: str, channel_topics: List[str]) -> float:
-        """主题相关性"""
+        """主题相关性（规则方法）"""
         if not channel_topics:
             return 50
         
@@ -605,7 +757,8 @@ class PredictiveRecommendationEngine:
             'tier': tier,
             'predicted_views': predicted_views,
             'description': description,
-            'confidence': round(match_score, 0)
+            'confidence': round(match_score, 0),
+            'method': 'rule_based'
         }
     
     def _suggest_format(self, keyword, content_style) -> str:

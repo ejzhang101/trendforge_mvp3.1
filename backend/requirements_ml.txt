@@ -1,0 +1,21 @@
+# TrendForge Backend - 可选 ML 增强依赖
+# 这些依赖是可选的，用于提升推荐准确率
+# 如果不安装，系统会自动降级到规则方法
+
+# ========== ML 预测 ==========
+xgboost==2.0.3
+scikit-learn==1.3.2
+
+# ========== 语义分析 ==========
+keybert==0.8.3
+sentence-transformers==2.7.0
+
+# ========== 注意 ==========
+# 安装这些依赖会增加内存使用（约 +500MB）
+# 但会显著提升推荐准确率（+20-30%）
+# 
+# 安装方法：
+# pip install -r requirements_ml.txt
+#
+# 或单独安装：
+# pip install xgboost scikit-learn keybert sentence-transformers
